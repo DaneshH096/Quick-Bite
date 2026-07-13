@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Delivery Dashboard – QuickBite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    body { background:#f4f5f7; }
+    .dp-nav {
+      background:#1a1a2e; color:#fff; display:flex;
+      align-items:center; justify-content:space-between;
+      padding:0 24px; height:60px; position:sticky; top:0; z-index:100;
+    }
+    .dp-brand { font-family:'Syne',sans-serif; font-size:1.2rem; font-weight:800;
+      color:#ff7043; text-decoration:none; }
+    .dp-brand span { color:#ffb300; }
+    .avail-toggle {
+      display:flex; align-items:center; gap:10px;
+      background:rgba(255,255,255,.08); padding:8px 14px;
+      border-radius:10px; cursor:pointer; user-select:none;
+    }
+    .toggle-label { font-size:.85rem; font-weight:600; color:rgba(255,255,255,.8); }
+    .toggle-switch {
+      width:40px; height:22px; border-radius:11px;
+      background:#555; position:relative; transition:.25s; cursor:pointer;
+    }
+    .toggle-switch.on { background:#4caf50; }
+    .toggle-switch::after {
+      content:''; position:absolute; top:3px; left:3px;
+      width:16px; height:16px; border-radius:50%; background:#fff;
+      transition:.25s;
+    }
+    .toggle-switch.on::after { left:21px; }
+    .dp-main { max-width:1100px; margin:0 auto; padding:28px 20px; }
+    .dp-grid { display:grid; grid-template-columns:1fr 380px; gap:24px; align-items:start; }
+    @media(max-width:860px) { .dp-grid { grid-template-columns:1fr; } }
+    .card { background:#fff; border-radius:16px; padding:22px 24px;
+      box-shadow:0 2px 14px rgba(0,0,0,.07); }
+    .card-title { font-family:'Syne',sans-serif; font-size:1.1rem; font-weight:800;
+      margin-bottom:16px; }
+    .active-order-banner {
+      background:linear-gradient(135deg,#e53935,#ff7043);
+      border-radius:16px; padding:22px 24px; color:#fff; margin-bottom:24px;
+    }
+    .active-order-banner h2 { font-family:'Syne',sans-serif; font-size:1.3rem; margin-bottom:6px; }
+    .order-detail-row { display:flex; gap:8px; align-items:flex-start;
+      font-size:.9rem; margin-bottom:6px; opacity:.92; }
+    .detail-label { font-weight:700; min-width:80px; opacity:.8; font-size:.82rem;
+      text-transform:uppercase; letter-spacing:.4px; }
+    .deliver-btn {
+      margin-top:16px; padding:12px 28px;
+      background:#fff; color:#e53935; border:none; border-radius:10px;
+      font-family:'DM Sans',sans-serif; font-weight:700; font-size:.95rem;
+      cursor:pointer; transition:.2s;
+    }
+    .deliver-btn:hover { background:#ffebee; }
+    #delivery-map { width:100%; height:340px; border-radius:12px; overflow:hidden; }
+    .stats-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
+    .stat-mini { background:#f9f9fb; border-radius:12px; padding:14px 16px; text-align:center; }
+    .stat-mini .val { font-family:'Syne',sans-serif; font-size:1.6rem; font-weight:800; color:#e53935; }
+    .stat-mini .lbl { font-size:.78rem; color:#999; font-weight:600;
+      text-transform:uppercase; letter-spacing:.4px; margin-top:2px; }
+    .order-row {
+      display:flex; justify-content:space-between; align-items:center;
+      padding:12px 0; border-bottom:1px solid #f5f5f5;
+    }
+    .order-row:last-child { border-bottom:none; }
+    .order-row-info h4 { font-size:.9rem; font-weight:700; margin-bottom:2px; }
+    .order-row-info p  { font-size:.8rem; color:#aaa; }
+    .status-pill { padding:4px 10px; border-radius:20px; font-size:.75rem; font-weight:700; }
+    .pill-delivered { background:#e8f5e9; color:#2e7d32; }
+    .pill-out       { background:#e3f2fd; color:#1565c0; }
+    .pill-cancelled { background:#ffebee; color:#c62828; }
+    .gps-hint { font-size:.78rem; color:#888; margin-top:6px; }
+    .gps-active { color:#2e7d32; font-weight:600; }
+    .no-order-state { text-align:center; padding:32px 0; color:#bbb; }
+    .no-order-state .icon { font-size:2.5rem; margin-bottom:8px; }
+    /* Toast */
+    .toast {
+      position:fixed; bottom:28px; right:28px; z-index:9999;
+      padding:12px 20px; border-radius:12px; font-weight:600; font-size:.9rem;
+      color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.2);
+      animation:slideUp .25s ease; pointer-events:none;
+    }
+    .toast.success { background:#2e7d32; }
+    .toast.error   { background:#c62828; }
+    @keyframes slideUp { from{transform:translateY(16px);opacity:0} to{transform:translateY(0);opacity:1} }
+  </style>
+</head>
+<body>
+
+<nav class="dp-nav">
+  <a class="dp-brand" href="/delivery">Quick<span>Bite</span> Delivery</a>
+  <div style="display:flex;align-items:center;gap:16px;">
+    <!--
+      FIX: Availability toggle now calls toggleAvailability() which reads
+      the current state from the JS variable (initialised from Thymeleaf below)
+      and POSTs to /delivery/availability with the CSRF header.
+    -->
+    <div class="avail-toggle" id="availToggle" onclick="toggleAvailability()">
+      <span class="toggle-label" id="availLabel">Available</span>
+      <div class="toggle-switch on" id="availSwitch"></div>
+    </div>
+    <form method="post" action="/logout" style="display:inline">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" th:if="${_csrf}"/>
+      <button type="submit" class="btn-logout">Sign Out</button>
+    </form>
+  </div>
+</nav>
+
+<main class="dp-main">
+  <h1 style="font-family:'Syne',sans-serif;font-size:1.6rem;margin-bottom:20px;">
+    Hey <span th:text="${partner.name}">Partner</span> 👋
+    <span style="font-size:.9rem;color:#aaa;font-weight:400;margin-left:6px;"
+          th:text="${partner.vehicleType}"></span>
+  </h1>
+
+  <!-- Active Order Banner -->
+  <div th:if="${activeOrder != null}" class="active-order-banner">
+    <h2>🛵 Active Delivery — Order #<span th:text="${activeOrder.id}"></span>
+      <span style="font-size:.8rem;font-weight:600;opacity:.85;margin-left:8px;"
+            th:text="'(' + ${activeOrder.status} + ')'"></span>
+    </h2>
+    <div class="order-detail-row">
+      <span class="detail-label">Customer</span>
+      <span th:text="${activeOrder.user.name + ' · ' + activeOrder.user.phone}"></span>
+    </div>
+    <div class="order-detail-row">
+      <span class="detail-label">Address</span>
+      <span th:text="${activeOrder.deliveryAddress}"></span>
+    </div>
+    <div class="order-detail-row" th:if="${activeOrder.deliveryLat != null}">
+      <span class="detail-label">GPS</span>
+      <span th:text="${activeOrder.deliveryLat + ', ' + activeOrder.deliveryLng}"></span>
+    </div>
+    <div class="order-detail-row">
+      <span class="detail-label">Amount</span>
+      <span>₹<span th:text="${activeOrder.totalAmount}"></span></span>
+    </div>
+    <div class="order-detail-row">
+      <span class="detail-label">Payment</span>
+      <span th:text="${activeOrder.paymentMethod}"></span>
+    </div>
+    <!--
+      FIX: Use data-id + plain onclick instead of th:onclick string concat
+      (th:onclick with + concat causes Eclipse parser errors)
+    -->
+    <button th:if="${activeOrder.status.name() == 'PREPARED'}"
+            class="deliver-btn" th:data-id="${activeOrder.id}"
+            onclick="advanceOrder(this.dataset.id, 'picked-up', '📦 Marked as Picked Up!')">
+      📦 Mark as Picked Up
+    </button>
+    <button th:if="${activeOrder.status.name() == 'PICKED_UP'}"
+            class="deliver-btn" th:data-id="${activeOrder.id}"
+            onclick="advanceOrder(this.dataset.id, 'out-for-delivery', '🛵 Order is now Out for Delivery!')">
+      🛵 Start Delivery
+    </button>
+    <button th:if="${activeOrder.status.name() == 'OUT_FOR_DELIVERY'}"
+            class="deliver-btn" th:data-id="${activeOrder.id}"
+            onclick="advanceOrder(this.dataset.id, 'delivered', '✅ Order marked as Delivered!')">
+      ✅ Mark as Delivered
+    </button>
+  </div>
+
+  <div th:unless="${activeOrder != null}" class="card" style="margin-bottom:24px;padding:24px;">
+    <div class="card-title">🍽 Ready for Pickup</div>
+    <div id="ready-pool">
+      <p style="text-align:center;color:#bbb;padding:12px;">Checking for ready orders…</p>
+    </div>
+  </div>
+
+  <div class="dp-grid">
+    <!-- Left: Map -->
+    <div class="card">
+      <div class="card-title">📍 Delivery Map</div>
+      <div id="delivery-map"></div>
+      <div class="gps-hint" id="gpsHint">Tap "Share my location" to appear on the admin map.</div>
+      <button onclick="shareLocation()" style="margin-top:12px;padding:9px 18px;
+        background:#e53935;color:#fff;border:none;border-radius:8px;
+        font-family:'DM Sans',sans-serif;font-weight:700;cursor:pointer;font-size:.88rem;">
+        📡 Share My Location
+      </button>
+    </div>
+
+    <!-- Right: Stats + Orders -->
+    <div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="stats-row">
+          <div class="stat-mini">
+            <div class="val" th:text="${myOrders.size()}">0</div>
+            <div class="lbl">Total Runs</div>
+          </div>
+          <div class="stat-mini">
+            <!--
+              FIX: Thymeleaf's selection expression .?[] filters the list
+              without needing Java stream/lambda (which SpEL does NOT support)
+            -->
+            <div class="val"
+                 th:text="${#lists.size(myOrders.?[status.name() == 'DELIVERED'])}">0</div>
+            <div class="lbl">Delivered</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🗂 Recent Deliveries</div>
+        <div th:if="${#lists.isEmpty(myOrders)}" style="text-align:center;color:#ccc;padding:20px;">
+          No deliveries yet
+        </div>
+        <div th:each="o : ${myOrders}" class="order-row">
+          <div class="order-row-info">
+            <h4>#<span th:text="${o.id}"></span> · <span th:text="${o.restaurant.name}"></span></h4>
+            <p th:text="${o.user.name + ' · ₹' + o.totalAmount}"></p>
+          </div>
+          <span class="status-pill"
+                th:classappend="${o.status.name() == 'DELIVERED' ? 'pill-delivered' :
+                                  o.status.name() == 'CANCELLED' ? 'pill-cancelled' : 'pill-out'}"
+                th:text="${o.status}"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script th:inline="javascript">
+/*<![CDATA[*/
+
+// ── Partner state injected by Thymeleaf at render time ────────
+const PARTNER_ID   = /*[[${partner.id}]]*/ 0;
+const PARTNER_LAT  = /*[[${partner.currentLat}]]*/ null;
+const PARTNER_LNG  = /*[[${partner.currentLng}]]*/ null;
+const IS_AVAILABLE = /*[[${partner.isAvailable}]]*/ true;
+
+const HAS_ACTIVE  = /*[[${activeOrder != null}]]*/ false;
+const ACTIVE_LAT  = /*[[${activeOrder?.deliveryLat}]]*/ null;
+const ACTIVE_LNG  = /*[[${activeOrder?.deliveryLng}]]*/ null;
+const ACTIVE_ADDR = /*[[${activeOrder?.deliveryAddress}]]*/ '';
+const ACTIVE_ID   = /*[[${activeOrder?.id}]]*/ null;
+
+// ── CSRF token for POST requests (needed even with CSRF disabled as safety) ──
+// We read it from the meta tag Thymeleaf rendered — works with or without CSRF
+function getCsrfToken() {
+  const meta = document.querySelector('meta[name="_csrf"]');
+  return meta ? meta.getAttribute('content') : '';
+}
+function getCsrfHeader() {
+  const meta = document.querySelector('meta[name="_csrf_header"]');
+  return meta ? meta.getAttribute('content') : 'X-CSRF-TOKEN';
+}
+
+// ── Availability toggle ───────────────────────────────────────
+let available = IS_AVAILABLE;
+
+// Set initial visual state
+document.getElementById('availSwitch').classList.toggle('on', available);
+document.getElementById('availLabel').textContent = available ? 'Available' : 'Offline';
+
+function toggleAvailability() {
+  available = !available;
+  const sw  = document.getElementById('availSwitch');
+  const lbl = document.getElementById('availLabel');
+  sw.classList.toggle('on', available);
+  lbl.textContent = available ? 'Available' : 'Offline';
+
+  fetch('/delivery/availability', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ available: available })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      showToast(available ? '🟢 You are now Available' : '🟡 You are now Offline', 'success');
+    } else {
+      // Revert on failure
+      available = !available;
+      sw.classList.toggle('on', available);
+      lbl.textContent = available ? 'Available' : 'Offline';
+      showToast('❌ Failed to update: ' + (data.message || 'Unknown error'), 'error');
+    }
+  })
+  .catch(err => {
+    available = !available;
+    sw.classList.toggle('on', available);
+    lbl.textContent = available ? 'Available' : 'Offline';
+    showToast('❌ Network error — try again', 'error');
+    console.error('Toggle availability error:', err);
+  });
+}
+
+// ── Leaflet map setup ─────────────────────────────────────────
+const defaultLat = PARTNER_LAT || 12.9716;
+const defaultLng = PARTNER_LNG || 77.5946;
+
+const map = L.map('delivery-map').setView([defaultLat, defaultLng], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+const partnerIcon = L.divIcon({
+  html: '<div style="width:28px;height:28px;border-radius:50%;background:#1565c0;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:14px;">🛵</div>',
+  iconSize:[28,28], iconAnchor:[14,14], className:''
+});
+let partnerMarker = null;
+
+if (PARTNER_LAT && PARTNER_LNG) {
+  partnerMarker = L.marker([PARTNER_LAT, PARTNER_LNG], { icon: partnerIcon })
+    .addTo(map).bindPopup('You are here');
+}
+
+if (HAS_ACTIVE && ACTIVE_LAT && ACTIVE_LNG) {
+  const custIcon = L.divIcon({
+    html: '<div style="width:28px;height:28px;border-radius:50%;background:#e53935;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:14px;">🏠</div>',
+    iconSize:[28,28], iconAnchor:[14,14], className:''
+  });
+  L.marker([ACTIVE_LAT, ACTIVE_LNG], { icon: custIcon })
+    .addTo(map)
+    .bindPopup('<b>Deliver to:</b><br>' + ACTIVE_ADDR).openPopup();
+
+  if (PARTNER_LAT && PARTNER_LNG) {
+    L.polyline([ [PARTNER_LAT, PARTNER_LNG], [ACTIVE_LAT, ACTIVE_LNG] ],
+               { color:'#e53935', weight:3, dashArray:'8 6', opacity:.8 }).addTo(map);
+    map.fitBounds([ [PARTNER_LAT, PARTNER_LNG], [ACTIVE_LAT, ACTIVE_LNG] ], { padding:[40,40] });
+  } else {
+    map.setView([ACTIVE_LAT, ACTIVE_LNG], 14);
+  }
+}
+
+// ── Share partner live location ───────────────────────────────
+let watchId = null;
+
+function shareLocation() {
+  if (!navigator.geolocation) {
+    showToast('❌ Geolocation not supported by your browser', 'error');
+    return;
+  }
+  const hint = document.getElementById('gpsHint');
+  hint.textContent = '⏳ Getting your location…';
+  hint.className   = 'gps-hint';
+
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+
+  watchId = navigator.geolocation.watchPosition(
+    pos => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+
+      hint.className   = 'gps-hint gps-active';
+      hint.textContent = '📡 Live: ' + lat.toFixed(5) + ', ' + lng.toFixed(5);
+
+      // Update map marker
+      if (!partnerMarker) {
+        partnerMarker = L.marker([lat, lng], { icon: partnerIcon })
+          .addTo(map).bindPopup('You are here');
+      } else {
+        partnerMarker.setLatLng([lat, lng]);
+      }
+      map.setView([lat, lng], 14);
+
+      // POST location to server
+      fetch('/delivery/location', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: lat, lng: lng })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.success) {
+          console.warn('Location update failed:', data.message);
+        }
+      })
+      .catch(err => console.error('Location POST error:', err));
+    },
+    err => {
+      const msgs = { 1: 'Permission denied', 2: 'Position unavailable', 3: 'Timed out' };
+      hint.className   = 'gps-hint';
+      hint.textContent = '❌ ' + (msgs[err.code] || 'Location error');
+      showToast('❌ Could not get location: ' + (msgs[err.code] || err.message), 'error');
+    },
+    { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
+  );
+}
+
+// ── Advance an order one stage in the pickup → delivery pipeline ──
+async function advanceOrder(orderId, step, successMsg) {
+  if (!confirm('Confirm this step for Order #' + orderId + '?')) return;
+  try {
+    const resp = await fetch('/delivery/orders/' + orderId + '/' + step, { method: 'POST' });
+    const data = await resp.json();
+    if (data.success) {
+      showToast(successMsg, 'success');
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      showToast('❌ ' + (data.message || 'Could not update order'), 'error');
+    }
+  } catch (e) {
+    showToast('❌ Network error — try again', 'error');
+  }
+}
+
+// ── Toast helper ──────────────────────────────────────────────
+function showToast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast ' + (type || 'success');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity .4s'; }, 2800);
+  setTimeout(() => t.remove(), 3200);
+}
+
+// ── Ready-for-pickup pool (unassigned PREPARED orders) ─────────
+async function loadReadyPool() {
+  const el = document.getElementById('ready-pool');
+  if (!el || HAS_ACTIVE) return; // only relevant when partner has no active order
+  try {
+    const resp = await fetch('/delivery/orders/ready');
+    const orders = await resp.json();
+    if (!orders.length) {
+      el.innerHTML = '<p style="text-align:center;color:#bbb;padding:12px;">No orders ready right now — check back soon.</p>';
+      return;
+    }
+    el.innerHTML = orders.map(o => `
+      <div class="order-row">
+        <div class="order-row-info">
+          <h4>#${o.id} · ${o.restaurantName || 'Restaurant'}</h4>
+          <p>${o.deliveryAddress} · ₹${parseFloat(o.totalAmount).toFixed(2)}</p>
+        </div>
+        <button class="deliver-btn" style="padding:8px 16px;font-size:.85rem;"
+                onclick="acceptOrder(${o.id})">Accept</button>
+      </div>`).join('');
+  } catch (e) {
+    el.innerHTML = '<p style="text-align:center;color:#c62828;padding:12px;">Could not load ready orders.</p>';
+  }
+}
+
+async function acceptOrder(orderId) {
+  try {
+    const resp = await fetch('/delivery/orders/' + orderId + '/accept', { method: 'POST' });
+    const data = await resp.json();
+    if (data.success) {
+      showToast('✅ Order #' + orderId + ' accepted!', 'success');
+      setTimeout(() => window.location.reload(), 900);
+    } else {
+      showToast('❌ ' + (data.message || 'Could not accept order'), 'error');
+      loadReadyPool();
+    }
+  } catch (e) {
+    showToast('❌ Network error — try again', 'error');
+  }
+}
+
+if (!HAS_ACTIVE) {
+  loadReadyPool();
+  setInterval(loadReadyPool, 12000);
+}
+
+// Auto-start location sharing on page load
+shareLocation();
+
+/*]]>*/
+</script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login – QuickBite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <style>
+    .auth-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center;
+      background: radial-gradient(ellipse at 70% 20%, #fff3e0 0%, #fce4ec 50%, #f3e5f5 100%); }
+    .auth-card { background:#fff; border-radius:24px; padding:48px 40px; width:100%; max-width:440px;
+      box-shadow:0 20px 60px rgba(0,0,0,0.10); }
+    .auth-logo { font-family:'Syne',sans-serif; font-size:2rem; font-weight:800;
+      color:#e53935; letter-spacing:-1px; margin-bottom:8px; }
+    .auth-logo span { color:#ff7043; }
+    .auth-sub { color:#888; font-size:.95rem; margin-bottom:32px; }
+    .form-group { margin-bottom:20px; }
+    .form-group label { display:block; font-weight:600; font-size:.88rem;
+      color:#444; margin-bottom:6px; text-transform:uppercase; letter-spacing:.5px; }
+    .form-group input { width:100%; padding:14px 16px; border:2px solid #eee; border-radius:12px;
+      font-family:'DM Sans',sans-serif; font-size:1rem; outline:none; transition:.2s;
+      box-sizing:border-box; }
+    .form-group input:focus { border-color:#e53935; }
+    .btn-primary { width:100%; padding:15px; background:linear-gradient(135deg,#e53935,#ff7043);
+      color:#fff; border:none; border-radius:12px; font-size:1.05rem; font-weight:700;
+      font-family:'DM Sans',sans-serif; cursor:pointer; transition:.2s; margin-top:4px; }
+    .btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(229,57,53,.35); }
+    .auth-footer { text-align:center; margin-top:24px; color:#888; font-size:.92rem; }
+    .auth-footer a { color:#e53935; font-weight:600; text-decoration:none; }
+    .alert { padding:12px 16px; border-radius:10px; margin-bottom:20px; font-size:.92rem; }
+    .alert-danger  { background:#ffebee; color:#c62828; border:1px solid #ffcdd2; }
+    .alert-success { background:#e8f5e9; color:#2e7d32; border:1px solid #c8e6c9; }
+    .divider { display:flex; align-items:center; gap:12px; margin:24px 0; color:#ccc; font-size:.85rem; }
+    .divider::before,.divider::after { content:''; flex:1; height:1px; background:#eee; }
+  </style>
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">Quick<span>Bite</span> 🍔</div>
+    <p class="auth-sub">Sign in to order your favourite food</p>
+
+    <!-- Flash messages -->
+    <div th:if="${param.error}" class="alert alert-danger">
+      Invalid email or password. Please try again.
+    </div>
+    <div th:if="${param.registered}" class="alert alert-success">
+      Account created! You can now sign in.
+    </div>
+    <div th:if="${param.logout}" class="alert alert-success">
+      You have been signed out.
+    </div>
+    <div th:if="${param.passwordReset}" class="alert alert-success">
+      ✅ Password updated successfully! You can now sign in with your new password.
+    </div>
+
+    <form method="post" action="/login">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" th:if="${_csrf}"/>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" name="username" placeholder="you@example.com" required/>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="password" placeholder="Enter your password" required/>
+      </div>
+      <button type="submit" class="btn-primary">Sign In →</button>
+    </form>
+    <div style="text-align:center;margin-top:14px;">
+      <a href="/forgot-password" style="color:#e53935;font-size:.88rem;font-weight:600;text-decoration:none;">
+        Forgot your password?
+      </a>
+    </div>
+
+    <div class="divider">or</div>
+    <div class="auth-footer">
+      Don't have an account? <a href="/register">Create one free</a>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

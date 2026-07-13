@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Menu – Restaurant Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <link rel="stylesheet" href="/css/admin.css"/>
+</head>
+<body class="admin-body">
+
+<nav class="admin-nav">
+  <a class="nav-brand" href="/restaurant-portal">Quick<span>Bite</span> Owner</a>
+  <div class="nav-links">
+    <a href="/restaurant-portal">Dashboard</a>
+    <a href="/restaurant-portal/orders">Orders</a>
+    <a href="/restaurant-portal/menu" class="active">Menu</a>
+    <a href="/restaurant-portal/profile">Profile</a>
+    <form method="post" action="/logout" style="display:inline">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" th:if="${_csrf}"/>
+      <button type="submit" class="btn-logout">Sign Out</button>
+    </form>
+  </div>
+</nav>
+
+<main class="admin-main">
+  <h1 class="admin-title">Menu – <span th:text="${restaurant.name}"></span></h1>
+
+  <div style="display:grid;grid-template-columns:1fr 380px;gap:32px;align-items:start;">
+
+    <!-- Menu Items Table -->
+    <div class="admin-card">
+      <div class="table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>Photo</th><th>Item</th><th>Category</th><th>Price</th><th>Veg</th><th>Available</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            <tr th:each="item : ${menuItems}">
+              <td>
+                <img th:if="${item.imageUrl}" th:src="${item.imageUrl}" th:alt="${item.name}"
+                     style="width:56px;height:56px;object-fit:cover;border-radius:8px;"/>
+                <span th:unless="${item.imageUrl}" style="color:#ccc;font-size:.78rem;">No photo</span>
+              </td>
+              <td><strong th:text="${item.name}"></strong><br/>
+                  <small style="color:#aaa;" th:text="${item.description}"></small></td>
+              <td th:text="${item.category}"></td>
+              <td>₹<span th:text="${item.price}"></span></td>
+              <td th:text="${item.isVegetarian ? '🟢' : '🔴'}"></td>
+              <td>
+                <button class="btn-sm" th:classappend="${item.isAvailable ? 'blue' : 'red'}"
+                        th:text="${item.isAvailable ? 'In stock' : '86’d'}"
+                        th:data-id="${item.id}"
+                        th:data-available="${item.isAvailable}"
+                        onclick="toggleAvailability(this)"></button>
+              </td>
+              <td>
+                <a th:href="@{/restaurant-portal/menu/delete/{itemId}(itemId=${item.id})}"
+                   class="btn-sm red" onclick="return confirm('Delete item?')">Delete</a>
+              </td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(menuItems)}">
+              <td colspan="7" style="text-align:center;color:#aaa;padding:32px;">No dishes yet — add your first one →</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Add Dish Form -->
+    <div class="admin-card" style="padding:24px;">
+      <h3 style="margin-bottom:20px;">+ Add Dish</h3>
+      <form method="post" action="/restaurant-portal/menu/save" enctype="multipart/form-data">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" th:if="${_csrf}"/>
+        <div class="form-group">
+          <label>Dish Name *</label>
+          <input type="text" name="name" required/>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea name="description" rows="2"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Price (₹) *</label>
+            <input type="number" name="price" step="0.01" required/>
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <input type="text" name="category" placeholder="e.g. Starters"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Dish Photo</label>
+          <input type="file" name="photo" accept="image/*"/>
+        </div>
+        <div class="form-group">
+          <label>...or Image URL (used if no photo uploaded)</label>
+          <input type="text" name="imageUrl" placeholder="https://..."/>
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" name="isVegetarian" id="isVeg" style="width:auto"/>
+          <label for="isVeg" style="text-transform:none;letter-spacing:0;font-size:.95rem;">Vegetarian</label>
+        </div>
+        <button type="submit" class="btn-red" style="width:100%;">Add Dish</button>
+      </form>
+    </div>
+  </div>
+</main>
+
+<script th:inline="javascript">
+async function toggleAvailability(btn) {
+  const id = btn.dataset.id;
+  const available = btn.dataset.available === 'true' ? false : true;
+  try {
+    const resp = await fetch('/restaurant-portal/menu/' + id + '/availability', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ available: available })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      window.location.reload();
+    } else {
+      alert('Failed: ' + (data.message || 'unknown error'));
+    }
+  } catch (e) {
+    alert('Network error — try again');
+  }
+}
+</script>
+
+</body>
+</html>

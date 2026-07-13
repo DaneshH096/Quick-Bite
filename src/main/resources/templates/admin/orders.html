@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Orders – Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link
+	href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap"
+	rel="stylesheet" />
+<link rel="stylesheet" href="/css/style.css" />
+<link rel="stylesheet" href="/css/admin.css" />
+<link rel="stylesheet"
+	href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+.assign-btn {
+	padding: 5px 11px;
+	border-radius: 7px;
+	font-size: .8rem;
+	font-weight: 700;
+	cursor: pointer;
+	border: none;
+	background: #e3f2fd;
+	color: #1565c0;
+	transition: .15s;
+}
+
+.assign-btn:hover {
+	background: #1565c0;
+	color: #fff;
+}
+
+.auto-btn {
+	padding: 5px 11px;
+	border-radius: 7px;
+	font-size: .8rem;
+	font-weight: 700;
+	cursor: pointer;
+	border: none;
+	background: #e8f5e9;
+	color: #2e7d32;
+	transition: .15s;
+}
+
+.auto-btn:hover {
+	background: #2e7d32;
+	color: #fff;
+}
+
+.partner-tag {
+	font-size: .78rem;
+	font-weight: 600;
+	color: #1565c0;
+	background: #e3f2fd;
+	padding: 3px 9px;
+	border-radius: 20px;
+}
+
+.gps-tag {
+	font-size: .75rem;
+	font-weight: 600;
+	padding: 3px 8px;
+	border-radius: 20px;
+}
+
+.gps-yes {
+	background: #e8f5e9;
+	color: #2e7d32;
+}
+
+.gps-no {
+	background: #f5f5f5;
+	color: #bbb;
+}
+/* assign modal */
+.modal-overlay {
+	display: none;
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, .5);
+	z-index: 999;
+	align-items: center;
+	justify-content: center;
+}
+
+.modal-box {
+	background: #fff;
+	border-radius: 20px;
+	padding: 28px;
+	width: 100%;
+	max-width: 480px;
+	box-shadow: 0 20px 60px rgba(0, 0, 0, .2);
+	max-height: 90vh;
+	overflow-y: auto;
+}
+
+.partner-option {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px;
+	border: 1.5px solid #eee;
+	border-radius: 10px;
+	cursor: pointer;
+	transition: .15s;
+	margin-bottom: 8px;
+}
+
+.partner-option:hover {
+	border-color: #1565c0;
+	background: #f0f7ff;
+}
+
+.partner-option.selected {
+	border-color: #1565c0;
+	background: #e3f2fd;
+}
+
+.partner-avatar {
+	width: 38px;
+	height: 38px;
+	border-radius: 50%;
+	background: linear-gradient(135deg, #1565c0, #42a5f5);
+	color: #fff;
+	font-weight: 800;
+	font-family: 'Syne', sans-serif;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+#mini-map {
+	width: 100%;
+	height: 200px;
+	border-radius: 10px;
+	margin: 12px 0;
+}
+</style>
+</head>
+<body class="admin-body">
+
+	<nav class="admin-nav">
+		<a class="nav-brand" href="/admin">Quick<span>Bite</span> Admin
+		</a>
+		<div class="nav-links">
+			<a href="/admin">Dashboard</a> <a href="/admin/restaurants">Restaurants</a>
+			<a href="/admin/orders" class="active">Orders</a> <a
+				href="/admin/delivery-partners">Partners</a> <a href="/admin/map">Live
+				Map</a>
+			<form method="post" action="/logout" style="display: inline">
+				<input type="hidden" th:name="${_csrf.parameterName}"
+					th:value="${_csrf.token}" th:if="${_csrf}" />
+				<button type="submit" class="btn-logout">Sign Out</button>
+			</form>
+		</div>
+	</nav>
+
+	<main class="admin-main">
+		<h1 class="admin-title">All Orders</h1>
+
+		<div class="admin-card">
+			<div class="table-wrap">
+				<table class="admin-table">
+					<thead>
+						<tr>
+							<th>#</th>
+							<th>Customer</th>
+							<th>Restaurant</th>
+							<th>Items</th>
+							<th>Amount</th>
+							<th>GPS</th>
+							<th>Status</th>
+							<th>Delivery Partner</th>
+							<th>Assign</th>
+							<th>Date</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr th:each="o : ${orders}" th:id="'row-' + ${o.id}">
+							<td th:text="'#' + ${o.id}"></td>
+							<td><strong th:text="${o.user.name}"></strong><br /> <small
+								th:text="${o.user.phone}"></small></td>
+							<td th:text="${o.restaurant.name}"></td>
+							<td><span th:each="oi,iter : ${o.orderItems}"> <span
+									th:text="${oi.menuItem.name + ' ×' + oi.quantity}"></span> <span
+									th:if="${!iter.last}">, </span>
+							</span></td>
+							<td><strong>₹<span th:text="${o.totalAmount}"></span></strong></td>
+							<!-- GPS badge -->
+							<td><span th:if="${o.deliveryLat != null}"
+								class="gps-tag gps-yes"
+								th:title="${o.deliveryLat + ', ' + o.deliveryLng}"> 📍
+									GPS </span> <span th:unless="${o.deliveryLat != null}"
+								class="gps-tag gps-no">No GPS</span></td>
+							<!-- Status dropdown -->
+							<td><select class="status-select" th:data-order-id="${o.id}"
+								onchange="updateStatus(this)">
+									<option value="PENDING"
+										th:selected="${o.status.name()=='PENDING'}">⏳ Pending</option>
+									<option value="CONFIRMED"
+										th:selected="${o.status.name()=='CONFIRMED'}">✅
+										Confirmed</option>
+									<option value="PREPARING"
+										th:selected="${o.status.name()=='PREPARING'}">👨‍🍳
+										Preparing</option>
+									<option value="PREPARED"
+										th:selected="${o.status.name()=='PREPARED'}">🍽
+										Prepared</option>
+									<option value="PICKED_UP"
+										th:selected="${o.status.name()=='PICKED_UP'}">📦
+										Picked Up</option>
+									<option value="OUT_FOR_DELIVERY"
+										th:selected="${o.status.name()=='OUT_FOR_DELIVERY'}">🛵
+										Out for Delivery</option>
+									<option value="DELIVERED"
+										th:selected="${o.status.name()=='DELIVERED'}">🎉
+										Delivered</option>
+									<option value="CANCELLED"
+										th:selected="${o.status.name()=='CANCELLED'}">❌
+										Cancelled</option>
+							</select></td>
+
+							<!-- Assigned partner display -->
+							<td th:id="'partner-cell-' + ${o.id}"><span
+								th:if="${o.deliveryPartnerId != null}"> <span
+									class="partner-tag"> 🛵 <span th:each="p : ${partners}"
+										th:if="${p != null and p.id == o.deliveryPartnerId}"
+										th:text="${p?.name}">Partner</span>
+
+								</span>
+							</span> <span th:unless="${o.deliveryPartnerId != null}"
+								style="color: #ccc; font-size: .82rem;">Unassigned</span></td>
+							<!-- Assign button (only for active statuses) -->
+							<td>
+								<div
+									th:if="${o.status.name() != 'DELIVERED' and o.status.name() != 'CANCELLED'}"
+									style="display: flex; flex-direction: column; gap: 4px;">
+									<button class="assign-btn"
+										th:onclick="'openAssignModal(' + ${o.id} + ','
+                                    + (${o.deliveryLat} != null ? ${o.deliveryLat} : 'null') + ','
+                                    + (${o.deliveryLng} != null ? ${o.deliveryLng} : 'null') + ')'">
+										👤 Assign</button>
+									<button class="auto-btn" th:if="${o.deliveryLat != null}"
+										th:onclick="'autoAssign(' + ${o.id} + ')'">⚡ Auto</button>
+								</div>
+							</td>
+							<td th:text="${#temporals.format(o.createdAt,'dd MM, HH:mm')}"></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</main>
+
+	<!-- Assign Partner Modal -->
+	<div class="modal-overlay" id="assignModal">
+		<div class="modal-box">
+			<h2
+				style="font-family: 'Syne', sans-serif; font-size: 1.2rem; margin-bottom: 4px;">
+				Assign Delivery Partner</h2>
+			<p style="color: #aaa; font-size: .85rem; margin-bottom: 12px;"
+				id="assignOrderLabel"></p>
+
+			<!-- Mini map showing delivery location -->
+			<div id="mini-map"></div>
+
+			<!-- Partner list -->
+			<div
+				style="font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #aaa; margin-bottom: 8px;">Available
+				Partners</div>
+			<div id="partnerList"></div>
+
+			<div id="assignMsg"
+				style="font-size: .85rem; font-weight: 600; margin-top: 8px; min-height: 18px;"></div>
+
+			<div style="display: flex; gap: 10px; margin-top: 16px;">
+				<button id="confirmAssignBtn" onclick="confirmAssign()"
+					style="flex: 1; padding: 12px; background: #1565c0; color: #fff; border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; transition: .2s;">
+					Confirm Assignment</button>
+				<button onclick="closeModal()"
+					style="padding: 12px 20px; border: 2px solid #eee; border-radius: 10px; background: #fff; cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 600;">
+					Cancel</button>
+			</div>
+		</div>
+	</div>
+
+	<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+	<script th:inline="javascript">
+
+const ALL_PARTNERS = [
+  /*[# th:each="p : ${partners}" ]*/
+  {
+	  id: /*[[${p != null ? p.id : 0}]]*/ 0,
+	  name: /*[[${p != null ? p.name : ''}]]*/ '',
+	  phone: /*[[${p != null ? p.phone : ''}]]*/ '',
+	  vehicle: /*[[${p != null ? p.vehicleType : ''}]]*/ '',
+	  lat: /*[[${p != null ? p.currentLat : null}]]*/ null,
+	  lng: /*[[${p != null ? p.currentLng : null}]]*/ null,
+	  avail: /*[[${p != null ? p.isAvailable : false}]]*/ false
+  },
+  /*[/]*/
+];
+
+let currentOrderId   = null;
+let currentOrderLat  = null;
+let currentOrderLng  = null;
+let selectedPartnerId = null;
+let miniMap          = null;
+
+// ── Status update ─────────────────────────────────────────────
+async function updateStatus(sel) {
+  const orderId = sel.dataset.orderId;
+  const status  = sel.value;
+  const resp = await fetch('/admin/orders/' + orderId + '/status', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ status })
+  });
+  const data = await resp.json();
+  if (data.success) {
+    sel.style.background = '#e8f5e9';
+    setTimeout(() => sel.style.background = '', 1000);
+  }
+}
+
+// ── Open assign modal ─────────────────────────────────────────
+function openAssignModal(orderId, lat, lng) {
+  currentOrderId  = orderId;
+  currentOrderLat = lat;
+  currentOrderLng = lng;
+  selectedPartnerId = null;
+
+  document.getElementById('assignOrderLabel').textContent = 'Order #' + orderId;
+  document.getElementById('assignMsg').textContent = '';
+  document.getElementById('assignModal').style.display = 'flex';
+
+  renderPartnerList();
+  renderMiniMap();
+}
+
+function closeModal() {
+  document.getElementById('assignModal').style.display = 'none';
+  if (miniMap) { miniMap.remove(); miniMap = null; }
+}
+
+// ── Render partner cards ──────────────────────────────────────
+function renderPartnerList() {
+  const container = document.getElementById('partnerList');
+  const available = ALL_PARTNERS.filter(p => p.avail);
+
+  if (available.length === 0) {
+    container.innerHTML = '<p style="color:#aaa;text-align:center;padding:16px;">No available partners right now.</p>';
+    return;
+  }
+
+  // Sort by distance if we have order GPS
+  let sorted = [...available];
+  if (currentOrderLat !== null && currentOrderLng !== null) {
+    sorted.sort((a, b) => {
+      const da = distKm(a.lat, a.lng, currentOrderLat, currentOrderLng);
+      const db = distKm(b.lat, b.lng, currentOrderLat, currentOrderLng);
+      return da - db;
+    });
+  }
+
+  container.innerHTML = sorted.map(p => {
+    const dist = (p.lat!==null && currentOrderLat!==null)
+      ? distKm(p.lat, p.lng, currentOrderLat, currentOrderLng).toFixed(1) + ' km away'
+      : (p.lat ? '📍 Has GPS' : '📍 No GPS');
+    return `
+      <div class="partner-option" id="po-${p.id}" onclick="selectPartner(${p.id})">
+        <div class="partner-avatar">${p.name.charAt(0)}</div>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:.9rem;">${p.name}</div>
+          <div style="font-size:.8rem;color:#aaa;">${p.phone || '—'} · ${p.vehicle || '—'}</div>
+        </div>
+        <span style="font-size:.78rem;font-weight:700;
+          background:${p.lat?'#e8f5e9':'#f5f5f5'};
+          color:${p.lat?'#2e7d32':'#bbb'};
+          padding:3px 9px;border-radius:20px;">${dist}</span>
+      </div>`;
+  }).join('');
+}
+
+function selectPartner(id) {
+  selectedPartnerId = id;
+  document.querySelectorAll('.partner-option').forEach(el => el.classList.remove('selected'));
+  document.getElementById('po-' + id)?.classList.add('selected');
+
+  // Draw line on mini map
+  const p = ALL_PARTNERS.find(x => x.id === id);
+  if (miniMap && p && p.lat && currentOrderLat) {
+    renderMiniMap(p);
+  }
+}
+
+// ── Mini map ──────────────────────────────────────────────────
+function renderMiniMap(selectedPartner) {
+  if (miniMap) { miniMap.remove(); miniMap = null; }
+
+  const lat = currentOrderLat || 12.9716;
+  const lng = currentOrderLng || 77.5946;
+  
+
+  miniMap = L.map('mini-map', { zoomControl:true, scrollWheelZoom:false })
+             .setView([lat, lng], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(miniMap);
+
+  if (currentOrderLat) {
+    const custIcon = L.divIcon({
+      html: '<div style="width:26px;height:26px;border-radius:50%;background:#e53935;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:13px;">🏠</div>',
+      iconSize:[26,26], iconAnchor:[13,13], className:''
+    });
+    L.marker([currentOrderLat, currentOrderLng], { icon: custIcon })
+     .addTo(miniMap).bindPopup('Delivery location').openPopup();
+  }
+
+  if (selectedPartner && selectedPartner.lat) {
+    const dpIcon = L.divIcon({
+      html: '<div style="width:26px;height:26px;border-radius:50%;background:#1565c0;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:13px;">🛵</div>',
+      iconSize:[26,26], iconAnchor:[13,13], className:''
+    });
+    L.marker( [selectedPartner.lat, selectedPartner.lng], { icon: dpIcon })
+     .addTo(miniMap).bindPopup(selectedPartner.name);
+
+    if (currentOrderLat) {
+      L.polyline(
+        [ [selectedPartner.lat, selectedPartner.lng], [currentOrderLat, currentOrderLng] ],
+        { color:'#1565c0', weight:3, dashArray:'7 5' }
+      ).addTo(miniMap);
+      miniMap.fitBounds(
+        [ [selectedPartner.lat, selectedPartner.lng], [currentOrderLat, currentOrderLng] ],
+        { padding:[24,24] }
+      );
+    }
+  }
+}
+
+// ── Confirm manual assignment ─────────────────────────────────
+async function confirmAssign() {
+  if (!selectedPartnerId) {
+    document.getElementById('assignMsg').style.color = '#c62828';
+    document.getElementById('assignMsg').textContent = '⚠ Please select a partner first.';
+    return;
+  }
+  const btn = document.getElementById('confirmAssignBtn');
+  btn.disabled = true; btn.textContent = 'Assigning…';
+
+  const resp = await fetch('/admin/orders/' + currentOrderId + '/assign', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ partnerId: selectedPartnerId })
+  });
+  const data = await resp.json();
+
+  if (data.success) {
+    // Update partner cell in table
+    const cell = document.getElementById('partner-cell-' + currentOrderId);
+    if (cell) cell.innerHTML =
+      `<span class="partner-tag">🛵 ${data.partnerName}</span>`;
+    closeModal();
+    showToast('✅ Assigned to ' + data.partnerName);
+  } else {
+    document.getElementById('assignMsg').style.color = '#c62828';
+    document.getElementById('assignMsg').textContent = '❌ ' + data.message;
+    btn.disabled = false; btn.textContent = 'Confirm Assignment';
+  }
+}
+
+// ── Auto-assign nearest ───────────────────────────────────────
+async function autoAssign(orderId) {
+  if (!confirm('Auto-assign nearest available partner to Order #' + orderId + '?')) return;
+
+  const resp = await fetch('/admin/orders/' + orderId + '/auto-assign', { method:'POST' });
+  const data = await resp.json();
+
+  if (data.success) {
+    const cell = document.getElementById('partner-cell-' + orderId);
+    if (cell) cell.innerHTML =
+      `<span class="partner-tag">🛵 ${data.partnerName}</span>`;
+    showToast('⚡ Auto-assigned to ' + data.partnerName);
+  } else {
+    alert('Auto-assign failed: ' + data.message);
+  }
+}
+
+// ── Toast notification ────────────────────────────────────────
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = `position:fixed;bottom:28px;right:28px;background:#1a1a2e;color:#fff;
+    padding:12px 20px;border-radius:12px;font-weight:600;font-size:.9rem;
+    z-index:2000;box-shadow:0 8px 24px rgba(0,0,0,.25);
+    animation:slideIn .25s ease;`;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ── Haversine distance ────────────────────────────────────────
+function distKm(lat1, lng1, lat2, lng2) {
+  if (lat1 === null || lat2 === null) return Infinity;
+  const R = 6371;
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLng = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// close on backdrop
+document.getElementById('assignModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+const style = document.createElement('style');
+style.textContent = '@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}';
+document.head.appendChild(style);
+</script>
+</body>
+</html>

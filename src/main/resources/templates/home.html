@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>QuickBite – Order Food</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <style>
+    .sort-bar {
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      margin-bottom:24px;
+    }
+    .sort-label {
+      font-size:.8rem; font-weight:700; color:#aaa;
+      text-transform:uppercase; letter-spacing:.5px; white-space:nowrap;
+    }
+    .sort-btn {
+      padding:7px 16px; border-radius:20px;
+      border:1.5px solid #eee; background:#fff;
+      font-family:'DM Sans',sans-serif; font-size:.83rem; font-weight:600;
+      color:#555; cursor:pointer; text-decoration:none;
+      transition:.15s; white-space:nowrap;
+    }
+    .sort-btn:hover  { border-color:#e53935; color:#e53935; }
+    .sort-btn.active {
+      background:#e53935; color:#fff; border-color:#e53935;
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-inner">
+    <a class="nav-brand" href="/home">Quick<span>Bite</span> 🍔</a>
+    <div class="nav-links">
+      <a href="/home" class="active">Restaurants</a>
+      <a href="/orders">My Orders</a>
+      <a href="/profile">Profile</a>
+      <form method="post" action="/logout" style="display:inline">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" th:if="${_csrf}"/>
+        <button type="submit" class="btn-logout">Sign Out</button>
+      </form>
+    </div>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-inner">
+    <h1>Hungry? <span>We've got you.</span></h1>
+    <p>Order from the best restaurants in Bengaluru. Fast delivery, hot food.</p>
+    <form method="get" action="/home" class="search-form">
+      <!-- Preserve current sort when searching -->
+      <input type="hidden" name="sort" th:value="${sort}" th:if="${sort != null}"/>
+      <input type="text" name="search" th:value="${search}"
+             placeholder="Search restaurants or cuisines…" class="search-input"/>
+      <button type="submit" class="search-btn">Search</button>
+    </form>
+  </div>
+</section>
+
+<main class="container" style="padding:48px 20px;">
+
+  <div class="section-header">
+    <h2 th:if="${search != null and !#strings.isEmpty(search)}">
+      Results for "<span th:text="${search}"></span>"
+    </h2>
+    <h2 th:unless="${search != null and !#strings.isEmpty(search)}">🏪 All Restaurants</h2>
+    <a th:if="${search != null}" href="/home" class="clear-search">Clear search ×</a>
+  </div>
+
+  <!--
+    Sort bar: each button is a plain link that adds ?sort=X to the URL.
+    The active button is highlighted by comparing th:classappend with current ${sort}.
+    Search query is preserved in the sort links so searching + sorting both work together.
+  -->
+  <div class="sort-bar">
+    <span class="sort-label">Sort by:</span>
+
+    <!-- Default (no sort param) -->
+    <a th:href="@{/home(search=${search})}"
+       th:classappend="${sort == null or sort == '' ? 'active' : ''}"
+       class="sort-btn">
+      🏠 Default
+    </a>
+
+    <!-- Sort by Rating -->
+    <a th:href="@{/home(search=${search}, sort='rating')}"
+       th:classappend="${sort == 'rating' ? 'active' : ''}"
+       class="sort-btn">
+      ⭐ Top Rated
+    </a>
+
+    <!-- Sort by Delivery Time -->
+    <a th:href="@{/home(search=${search}, sort='delivery')}"
+       th:classappend="${sort == 'delivery' ? 'active' : ''}"
+       class="sort-btn">
+      ⚡ Fastest Delivery
+    </a>
+
+    <!-- Sort by Min Order / Cost -->
+    <a th:href="@{/home(search=${search}, sort='cost')}"
+       th:classappend="${sort == 'cost' ? 'active' : ''}"
+       class="sort-btn">
+      💰 Low Min Order
+    </a>
+  </div>
+
+  <div class="restaurant-grid">
+    <a th:each="r : ${restaurants}" th:href="@{/restaurant/{id}(id=${r.id})}" class="restaurant-card">
+      <div class="card-img-wrap">
+        <img th:src="${r.imageUrl}"
+             th:alt="${r.name}"
+             data-fallback="/images/food-placeholder.jpg"
+             onerror="this.src=this.getAttribute('data-fallback')"/>
+        <span class="cuisine-tag" th:text="${r.cuisineType}"></span>
+        <span th:if="${!r.isOpen}"
+              style="position:absolute;top:10px;left:10px;background:#e53935;color:#fff;
+                     font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:20px;">
+          Closed
+        </span>
+      </div>
+      <div class="card-body">
+        <h3 th:text="${r.name}"></h3>
+        <p class="card-desc" th:text="${r.description}"></p>
+        <div class="card-meta">
+          <span class="rating">⭐ <strong th:text="${r.rating}"></strong></span>
+          <span class="dot">·</span>
+          <span class="time">⏱ <span th:text="${r.deliveryTimeMinutes}"></span> min</span>
+          <span class="dot">·</span>
+          <span class="min-order">Min ₹<span th:text="${r.minOrderAmount}"></span></span>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <div th:if="${#lists.isEmpty(restaurants)}" class="empty-state">
+    <div class="empty-icon">🔍</div>
+    <h3>No restaurants found</h3>
+    <p>Try a different search term or sort option.</p>
+    <a href="/home" class="btn-red">Browse All</a>
+  </div>
+</main>
+
+<footer class="footer">
+  <p>© 2025 QuickBite · Built with Spring Boot &amp; ❤️</p>
+</footer>
+
+</body>
+</html>

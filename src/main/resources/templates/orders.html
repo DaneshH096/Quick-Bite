@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Orders – QuickBite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-inner">
+    <a class="nav-brand" href="/home">Quick<span>Bite</span> 🍔</a>
+    <div class="nav-links">
+      <a href="/home">Restaurants</a>
+      <a href="/orders" class="active">My Orders</a>
+      <a href="/profile">Profile</a>
+      <form method="post" action="/logout" style="display:inline">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" th:if="${_csrf}"/>
+        <button type="submit" class="btn-logout">Sign Out</button>
+      </form>
+    </div>
+  </div>
+</nav>
+
+<main class="container" style="padding:48px 20px;">
+  <h1 style="font-family:'Syne',sans-serif;font-size:2rem;margin-bottom:8px;">My Orders</h1>
+  <p style="color:#888;margin-bottom:32px;">Track your past and current orders</p>
+
+  <div id="orders-container">
+    <div class="loading-spinner">Loading your orders…</div>
+  </div>
+</main>
+
+<script>
+  async function loadOrders() {
+    try {
+      const resp = await fetch('/api/orders/my');
+      const orders = await resp.json();
+      const container = document.getElementById('orders-container');
+
+      if (!orders || orders.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🛍</div>
+            <h3>No orders yet</h3>
+            <p>Place your first order and it will show up here.</p>
+            <a href="/home" class="btn-red">Order Now</a>
+          </div>`;
+        return;
+      }
+
+      const statusColors = {
+        PENDING: '#ff9800', CONFIRMED: '#2196f3', PREPARING: '#9c27b0',
+        PREPARED: '#8e24aa', PICKED_UP: '#00897b',
+        OUT_FOR_DELIVERY: '#03a9f4', DELIVERED: '#4caf50', CANCELLED: '#f44336'
+      };
+      const statusEmoji = {
+        PENDING: '⏳', CONFIRMED: '✅', PREPARING: '👨‍🍳',
+        PREPARED: '🍽', PICKED_UP: '📦',
+        OUT_FOR_DELIVERY: '🛵', DELIVERED: '🎉', CANCELLED: '❌'
+      };
+
+      let html = '<div class="orders-list">';
+      orders.forEach(order => {
+        const color = statusColors[order.status] || '#888';
+        const emoji = statusEmoji[order.status] || '📦';
+        const date = new Date(order.createdAt).toLocaleDateString('en-IN', {
+          day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'
+        });
+
+        let itemsHtml = '';
+        if (order.orderItems) {
+          order.orderItems.forEach(oi => {
+            itemsHtml += `<span class="order-item-tag">${oi.menuItem.name} ×${oi.quantity}</span>`;
+          });
+        }
+
+        html += `
+          <div class="order-card">
+            <div class="order-card-header">
+              <div>
+                <span class="order-id">#${order.id}</span>
+                <span class="order-restaurant">${order.restaurant ? order.restaurant.name : 'Restaurant'}</span>
+              </div>
+              <span class="order-status-badge" style="background:${color}20;color:${color};">
+                ${emoji} ${order.status}
+              </span>
+            </div>
+            <div class="order-items-list">${itemsHtml}</div>
+            <div class="order-card-footer">
+              <span class="order-date">🕐 ${date}</span>
+              <span class="order-total">₹${parseFloat(order.totalAmount).toFixed(2)}</span>
+            </div>
+          </div>`;
+      });
+      html += '</div>';
+      container.innerHTML = html;
+
+    } catch (e) {
+      document.getElementById('orders-container').innerHTML =
+        '<p style="color:red;">Failed to load orders. Please refresh.</p>';
+    }
+  }
+
+  loadOrders();
+  // Poll so the customer sees restaurant/delivery-partner status updates live,
+  // without needing to refresh the page manually.
+  setInterval(loadOrders, 10000);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title th:text="${errorTitle != null ? errorTitle + ' – QuickBite' : 'Error – QuickBite'}">Error – QuickBite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;align-items:center;
+      justify-content:center;background:radial-gradient(ellipse at 70% 30%,#fff3e0,#fce4ec 60%,#f3e5f5);}
+    .card{background:#fff;border-radius:28px;padding:56px 48px;max-width:480px;width:100%;
+      text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.10);}
+    .emoji{font-size:3.5rem;margin-bottom:16px;display:block;}
+    h1{font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;color:#1a1a2e;margin-bottom:12px;}
+    p{color:#888;font-size:.95rem;line-height:1.6;margin-bottom:28px;}
+    .btn{display:inline-block;padding:13px 28px;background:linear-gradient(135deg,#e53935,#ff7043);
+      color:#fff;border-radius:12px;text-decoration:none;font-weight:700;font-size:.95rem;
+      transition:.2s;margin:4px;}
+    .btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(229,57,53,.3);}
+    .btn-ghost{background:none;border:2px solid #eee;color:#555;}
+    .btn-ghost:hover{border-color:#e53935;color:#e53935;transform:none;box-shadow:none;}
+  </style>
+</head>
+<body>
+<div class="card">
+  <span class="emoji" th:text="${errorEmoji != null ? errorEmoji : '❌'}">❌</span>
+  <h1 th:text="${errorTitle != null ? errorTitle : 'Something went wrong'}">Something went wrong</h1>
+  <p th:text="${errorMessage != null ? errorMessage : 'An unexpected error occurred. Please try again.'}">
+    An unexpected error occurred.
+  </p>
+  <a href="/home" class="btn">🏠 Go Home</a>
+  <a th:if="${backUrl != null}" th:href="${backUrl}" class="btn btn-ghost">← Go Back</a>
+  <a th:unless="${backUrl != null}" href="javascript:history.back()" class="btn btn-ghost">← Go Back</a>
+</div>
+</body>
+</html>

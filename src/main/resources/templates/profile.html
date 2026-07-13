@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Profile – QuickBite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-inner">
+    <a class="nav-brand" href="/home">Quick<span>Bite</span> 🍔</a>
+    <div class="nav-links">
+      <a href="/home">Restaurants</a>
+      <a href="/orders">My Orders</a>
+      <a href="/profile" class="active">Profile</a>
+      <form method="post" action="/logout" style="display:inline">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" th:if="${_csrf}"/>
+        <button type="submit" class="btn-logout">Sign Out</button>
+      </form>
+    </div>
+  </div>
+</nav>
+
+<main class="container" style="padding:48px 20px;max-width:600px;">
+  <h1 style="font-family:'Syne',sans-serif;font-size:2rem;margin-bottom:8px;">My Profile</h1>
+  <p style="color:#888;margin-bottom:32px;">Update your personal details</p>
+
+  <div th:if="${param.updated}" style="background:#e8f5e9;color:#2e7d32;padding:12px 16px;border-radius:12px;margin-bottom:24px;">
+    ✅ Profile updated successfully!
+  </div>
+
+  <div class="profile-card">
+    <div class="profile-avatar">
+      <span th:text="${#strings.substring(user.name, 0, 1)}">U</span>
+    </div>
+    <div class="profile-email" th:text="${user.email}"></div>
+    <span class="profile-role-badge" th:text="${user.role}"></span>
+
+    <form method="post" action="/profile" class="profile-form">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" th:if="${_csrf}"/>
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" name="name" th:value="${user.name}" required/>
+      </div>
+      <div class="form-group">
+        <label>Phone</label>
+        <input type="tel" name="phone" th:value="${user.phone}"/>
+      </div>
+      <div class="form-group">
+        <label>Default Delivery Address</label>
+        <textarea name="address" rows="3" th:text="${user.address}"></textarea>
+      </div>
+      <button type="submit" class="btn-primary" style="width:100%;">Save Changes</button>
+    </form>
+  </div>
+</main>
+
+</body>
+</html>

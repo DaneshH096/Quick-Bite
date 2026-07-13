@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Register – QuickBite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <style>
+    .auth-wrap {
+      min-height:100vh; display:flex; align-items:center; justify-content:center;
+      padding:40px 20px;
+      background:radial-gradient(ellipse at 70% 20%,#fff3e0 0%,#fce4ec 50%,#f3e5f5 100%);
+    }
+    .auth-card {
+      background:#fff; border-radius:24px; padding:40px 36px;
+      width:100%; max-width:540px;
+      box-shadow:0 20px 60px rgba(0,0,0,.10);
+    }
+    .auth-logo { font-family:'Syne',sans-serif; font-size:1.9rem; font-weight:800;
+      color:#e53935; letter-spacing:-1px; margin-bottom:4px; }
+    .auth-logo span { color:#ff7043; }
+    .auth-sub { color:#888; font-size:.92rem; margin-bottom:28px; }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .form-group { margin-bottom:16px; }
+    .form-group label {
+      display:flex; align-items:center; gap:5px;
+      font-weight:600; font-size:.82rem; color:#555;
+      text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px;
+    }
+    .optional-tag {
+      font-size:.72rem; text-transform:none; letter-spacing:0;
+      font-weight:400; color:#aaa;
+    }
+    .form-group input, .form-group textarea {
+      width:100%; padding:11px 14px; border:2px solid #eee;
+      border-radius:10px; font-family:'DM Sans',sans-serif; font-size:.95rem;
+      outline:none; transition:.18s; box-sizing:border-box; resize:none;
+    }
+    .form-group input:focus, .form-group textarea:focus { border-color:#e53935; }
+    /* ── password ── */
+    .pw-wrap { position:relative; }
+    .pw-wrap input { padding-right:72px; }
+    .pw-actions {
+      position:absolute; right:8px; top:50%; transform:translateY(-50%);
+      display:flex; align-items:center; gap:2px;
+    }
+    .icon-btn {
+      background:none; border:none; cursor:pointer; padding:5px;
+      color:#bbb; border-radius:6px; display:flex; align-items:center;
+      transition:.15s;
+    }
+    .icon-btn:hover { color:#e53935; background:#fff5f5; }
+    /* ── popup ── */
+    .pw-popup-anchor { position:relative; }
+    .info-popup {
+      position:absolute; top:calc(100% + 8px); right:-8px; z-index:300;
+      background:#fff; border:1.5px solid #eee; border-radius:14px;
+      padding:14px 16px; width:256px; display:none;
+      box-shadow:0 10px 32px rgba(0,0,0,.13);
+    }
+    .info-popup.open { display:block; }
+    .popup-title {
+      font-size:.8rem; font-weight:700; color:#333;
+      text-transform:uppercase; letter-spacing:.4px; margin-bottom:10px;
+    }
+    .rule {
+      display:flex; align-items:center; gap:8px;
+      font-size:.85rem; color:#ccc; margin-bottom:7px; transition:.2s;
+    }
+    .rule:last-child { margin-bottom:0; }
+    .rule-dot {
+      width:9px; height:9px; border-radius:50%;
+      background:#e8e8e8; flex-shrink:0; transition:.2s;
+      border:1.5px solid #ddd;
+    }
+    .rule.ok   { color:#2e7d32; }
+    .rule.fail { color:#c62828; }
+    .rule.ok   .rule-dot { background:#c8e6c9; border-color:#4caf50; }
+    .rule.fail .rule-dot { background:#ffcdd2; border-color:#e53935; }
+    /* ── strength bar ── */
+    .pw-bar { height:3px; background:#f0f0f0; border-radius:2px; margin-top:6px; overflow:hidden; }
+    .pw-bar-fill { height:100%; border-radius:2px; width:0%; transition:width .3s,background .3s; }
+    .pw-bar-label { font-size:.76rem; font-weight:700; margin-top:4px; min-height:15px; }
+    .confirm-hint { font-size:.78rem; font-weight:600; margin-top:5px; min-height:15px; }
+    /* ── section divider ── */
+    .section-divider {
+      font-size:.78rem; font-weight:700; text-transform:uppercase;
+      letter-spacing:.6px; color:#bbb;
+      border-top:1.5px solid #f0f0f0; padding-top:18px; margin-bottom:16px;
+    }
+    /* ── location ── */
+    .loc-row { display:flex; gap:10px; align-items:flex-start; }
+    .loc-row .form-group { flex:1; margin-bottom:0; }
+    .loc-btn {
+      margin-top:26px; padding:11px 14px; flex-shrink:0;
+      border:2px solid #eee; border-radius:10px; background:#fff;
+      cursor:pointer; display:flex; align-items:center; gap:6px;
+      font-family:'DM Sans',sans-serif; font-size:.85rem; color:#666;
+      white-space:nowrap; transition:.18s;
+    }
+    .loc-btn:hover:not(:disabled) { border-color:#e53935; color:#e53935; }
+    .loc-btn:disabled { opacity:.5; cursor:not-allowed; }
+    .loc-status { font-size:.76rem; font-weight:600; min-height:16px; margin-top:4px; }
+    .loc-status.loading { color:#888; }
+    .loc-status.ok  { color:#2e7d32; }
+    .loc-status.err { color:#c62828; }
+    /* ── submit ── */
+    .btn-primary {
+      width:100%; padding:14px; margin-top:4px;
+      background:linear-gradient(135deg,#e53935,#ff7043);
+      color:#fff; border:none; border-radius:12px;
+      font-family:'DM Sans',sans-serif; font-weight:700; font-size:1rem;
+      cursor:pointer; transition:.2s;
+    }
+    .btn-primary:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 8px 24px rgba(229,57,53,.35); }
+    .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+    .auth-footer { text-align:center; margin-top:18px; color:#888; font-size:.88rem; }
+    .auth-footer a { color:#e53935; font-weight:600; text-decoration:none; }
+    .alert-danger {
+      background:#ffebee; color:#c62828; border:1px solid #ffcdd2;
+      padding:11px 14px; border-radius:10px; margin-bottom:18px; font-size:.88rem;
+    }
+  </style>
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">Quick<span>Bite</span> 🍔</div>
+    <p class="auth-sub">Create your free account</p>
+
+    <div th:if="${error}" class="alert-danger" th:text="${error}"></div>
+
+    <form method="post" action="/register" id="registerForm">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" th:if="${_csrf}"/>
+
+      <!-- Name + Email -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" name="name" placeholder="Rahul Sharma" required/>
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" name="email" placeholder="you@example.com" required/>
+        </div>
+      </div>
+
+      <!-- Phone -->
+      <div class="form-group">
+        <label>Phone</label>
+        <input type="tel" name="phone" placeholder="9876543210"/>
+      </div>
+
+      <!-- ── Password ─────────────────────────── -->
+      <div class="form-group pw-popup-anchor" id="pwGroup">
+        <label>
+          Password
+          <button type="button" class="icon-btn" onclick="toggleInfo(event)" title="Password rules">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M8 7.5v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              <circle cx="8" cy="4.8" r=".75" fill="currentColor"/>
+            </svg>
+          </button>
+        </label>
+
+        <div class="pw-wrap">
+          <input type="password" name="password" id="pwField"
+                 placeholder="Min 8 characters" oninput="checkPw()" required/>
+          <div class="pw-actions">
+            <button type="button" class="icon-btn" onclick="toggleShow('pwField','eyeIcon')"
+                    title="Show / hide password">
+              <svg id="eyeIcon" width="17" height="17" viewBox="0 0 20 20" fill="none">
+                <path d="M2 10C2 10 5 4 10 4s8 6 8 6-3 6-8 6-8-6-8-6z"
+                      stroke="currentColor" stroke-width="1.3"/>
+                <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Rules popup -->
+        <div class="info-popup" id="infoPopup">
+          <div class="popup-title">Password must have</div>
+          <div class="rule" id="rLen">  <div class="rule-dot"></div>8 to 20 characters</div>
+          <div class="rule" id="rUpper"><div class="rule-dot"></div>One uppercase letter (A–Z)</div>
+          <div class="rule" id="rLower"><div class="rule-dot"></div>One lowercase letter (a–z)</div>
+          <div class="rule" id="rSymbol"><div class="rule-dot"></div>One symbol (!@#$%^&amp;*…)</div>
+        </div>
+
+        <div class="pw-bar"><div class="pw-bar-fill" id="pwBarFill"></div></div>
+        <div class="pw-bar-label" id="pwBarLabel"></div>
+      </div>
+
+      <!-- ── Confirm Password ──────────────────── -->
+      <div class="form-group">
+        <label>Confirm Password</label>
+        <div class="pw-wrap">
+          <input type="password" name="confirmPassword" id="confirmField"
+                 placeholder="Re-enter password" oninput="checkConfirm()" required/>
+          <div class="pw-actions">
+            <button type="button" class="icon-btn" onclick="toggleShow('confirmField','eyeIcon2')"
+                    title="Show / hide">
+              <svg id="eyeIcon2" width="17" height="17" viewBox="0 0 20 20" fill="none">
+                <path d="M2 10C2 10 5 4 10 4s8 6 8 6-3 6-8 6-8-6-8-6z"
+                      stroke="currentColor" stroke-width="1.3"/>
+                <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="confirm-hint" id="confirmHint"></div>
+      </div>
+
+      <!-- ══ DELIVERY ADDRESS ══════════════════ -->
+      <div class="section-divider">📍 Delivery Address</div>
+
+      <!-- Area + Location button -->
+      <div class="loc-row">
+        <div class="form-group">
+          <label>Area / Locality</label>
+          <input type="text" name="area" id="areaField"
+                 placeholder="e.g. Indiranagar, Koramangala"/>
+          <div class="loc-status" id="locStatus"></div>
+        </div>
+        <button type="button" class="loc-btn" id="locBtn" onclick="fetchLocation()">
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="10" r="3.5" stroke="currentColor" stroke-width="1.3"/>
+            <path d="M10 2v2.5M10 15.5V18M2 10h2.5M15.5 10H18"
+                  stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          Use my location
+        </button>
+      </div>
+
+      <!-- Building + Floor -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>Building Name / Number</label>
+          <input type="text" name="buildingName" id="buildingField"
+                 placeholder="e.g. Brigade Gateway, No. 42"/>
+        </div>
+        <div class="form-group">
+          <label>Floor / Flat <span class="optional-tag">(optional)</span></label>
+          <input type="text" name="floorFlat" id="floorField"
+                 placeholder="e.g. 3rd floor, Flat 301"/>
+        </div>
+      </div>
+
+      <!-- Street -->
+      <div class="form-group">
+        <label>Street / Road</label>
+        <input type="text" name="street" id="streetField"
+               placeholder="e.g. 100 Feet Road, 12th Cross"/>
+      </div>
+
+      <!-- City + Pin -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>City</label>
+          <input type="text" name="city" id="cityField" placeholder="Bengaluru"/>
+        </div>
+        <div class="form-group">
+          <label>Pin Code</label>
+          <input type="text" name="pincode" id="pincodeField" placeholder="560038"/>
+        </div>
+      </div>
+
+      <!-- Landmark -->
+      <div class="form-group">
+        <label>Landmark <span class="optional-tag">(optional)</span></label>
+        <input type="text" name="landmark" id="landmarkField"
+               placeholder="e.g. near Forum Mall, opp. HDFC Bank"/>
+      </div>
+
+      <!-- Hidden combined address for backend -->
+      <input type="hidden" name="address" id="addressHidden"/>
+
+
+      <!-- ══ ACCOUNT TYPE ══════════════════════ -->
+      <div class="section-divider">👤 Account Type</div>
+      <div class="form-group">
+        <label>Register as</label>
+        <select name="role" id="roleSelect" onchange="toggleVehicle()"
+                style="width:100%;padding:11px 14px;border:2px solid #eee;border-radius:10px;
+                       font-family:'DM Sans',sans-serif;font-size:.95rem;outline:none;">
+          <option value="CUSTOMER">🛍 Customer — order food</option>
+          <option value="DELIVERY_PARTNER">🛵 Delivery Partner — earn by delivering</option>
+          <option value="RESTAURANT_OWNER">🍳 Restaurant Owner — list your restaurant</option>
+        </select>
+      </div>
+      <!-- Vehicle type (only shown for delivery partners) -->
+      <div class="form-group" id="vehicleGroup" style="display:none;">
+        <label>Vehicle Type</label>
+        <select name="vehicleType"
+                style="width:100%;padding:11px 14px;border:2px solid #eee;border-radius:10px;
+                       font-family:'DM Sans',sans-serif;font-size:.95rem;outline:none;">
+          <option value="Bike">🏍 Bike</option>
+          <option value="Scooter">🛵 Scooter</option>
+          <option value="Car">🚗 Car</option>
+          <option value="Cycle">🚲 Cycle</option>
+        </select>
+      </div>
+      <!-- Restaurant details (only shown for restaurant owners) -->
+      <div id="restaurantGroup" style="display:none;">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Restaurant Name</label>
+            <input type="text" name="restaurantName" placeholder="e.g. Spice Garden"/>
+          </div>
+          <div class="form-group">
+            <label>Cuisine Type</label>
+            <input type="text" name="cuisineType" placeholder="e.g. South Indian"/>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary" id="submitBtn">Create Account →</button>
+    </form>
+
+    <div class="auth-footer">Already have an account? <a href="/login">Sign in</a></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   PASSWORD VALIDATION
+═══════════════════════════════════════════════ */
+const rules = { len:false, upper:false, lower:false, symbol:false };
+let popupOpen = false;
+
+function toggleInfo(e) {
+  if (e) e.stopPropagation();
+  popupOpen = !popupOpen;
+  document.getElementById('infoPopup').classList.toggle('open', popupOpen);
+}
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#pwGroup')) {
+    popupOpen = false;
+    document.getElementById('infoPopup').classList.remove('open');
+  }
+});
+
+function setRule(id, ok, typed) {
+  const el = document.getElementById(id);
+  el.classList.toggle('ok',   ok);
+  el.classList.toggle('fail', !ok && typed);
+}
+
+function checkPw() {
+  const v = document.getElementById('pwField').value;
+  const t = v.length > 0;
+  rules.len    = v.length >= 8 && v.length <= 20;
+  rules.upper  = /[A-Z]/.test(v);
+  rules.lower  = /[a-z]/.test(v);
+  rules.symbol = /[!@#$%^&*()\-_=+\[\]{};:'",.<>/?`~\\|]/.test(v);
+
+  setRule('rLen',    rules.len,   t);
+  setRule('rUpper',  rules.upper, t);
+  setRule('rLower',  rules.lower, t);
+  setRule('rSymbol', rules.symbol,t);
+
+  const score  = Object.values(rules).filter(Boolean).length;
+  const pcts   = [0, 25, 50, 75, 100];
+  const colors = ['', '#e53935', '#ff9800', '#2196f3', '#4caf50'];
+  const labels = ['', 'Weak',    'Fair',    'Good',   'Strong'];
+
+  document.getElementById('pwBarFill').style.width      = pcts[score]+'%';
+  document.getElementById('pwBarFill').style.background = colors[score];
+  document.getElementById('pwBarLabel').style.color     = colors[score];
+  document.getElementById('pwBarLabel').textContent     = t ? labels[score] : '';
+  checkConfirm();
+}
+
+function checkConfirm() {
+  const pw = document.getElementById('pwField').value;
+  const co = document.getElementById('confirmField').value;
+  const h  = document.getElementById('confirmHint');
+  if (!co) { h.textContent = ''; return; }
+  if (pw === co) { h.style.color = '#2e7d32'; h.textContent = '✓ Passwords match'; }
+  else           { h.style.color = '#c62828'; h.textContent = '✗ Passwords do not match'; }
+}
+
+/* ─── Show / Hide ─────────────────────── */
+const EYE_OPEN = '<path d="M2 10C2 10 5 4 10 4s8 6 8 6-3 6-8 6-8-6-8-6z" stroke="currentColor" stroke-width="1.3"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.3"/>';
+const EYE_SHUT = '<line x1="3" y1="3" x2="17" y2="17" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M7 5.2A9.5 9.5 0 0 1 10 4.5c5 0 8 5.5 8 5.5a14 14 0 0 1-2.5 3.2" stroke="currentColor" stroke-width="1.3"/><path d="M5 7.2A10 10 0 0 0 2 10s3 5.5 8 5.5c1.7 0 3.2-.5 4.4-1.4" stroke="currentColor" stroke-width="1.3"/>';
+
+function toggleShow(fieldId, iconId) {
+  const inp = document.getElementById(fieldId);
+  const ico = document.getElementById(iconId);
+  const show = inp.type === 'text';
+  inp.type = show ? 'password' : 'text';
+  ico.innerHTML = show ? EYE_OPEN : EYE_SHUT;
+}
+
+/* ═══════════════════════════════════════════════
+   CURRENT LOCATION (OpenStreetMap / Nominatim)
+═══════════════════════════════════════════════ */
+function fetchLocation() {
+  const btn = document.getElementById('locBtn');
+  const st  = document.getElementById('locStatus');
+
+  if (!navigator.geolocation) {
+    st.className = 'loc-status err';
+    st.textContent = 'Geolocation not supported by this browser.';
+    return;
+  }
+
+  btn.disabled = true;
+  st.className = 'loc-status loading';
+  st.textContent = '⏳ Detecting your location…';
+
+  navigator.geolocation.getCurrentPosition(
+    async function(pos) {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      st.textContent = '📡 Fetching address details…';
+      try {
+        const resp = await fetch(
+          'https://nominatim.openstreetmap.org/reverse?lat=' + lat +
+          '&lon=' + lng + '&format=json&addressdetails=1',
+          { headers: { 'Accept-Language': 'en-IN,en' } }
+        );
+        const d = await resp.json();
+        const a = d.address || {};
+
+        // Priority-order OSM fields for Indian addresses
+        const area  = a.suburb || a.neighbourhood || a.quarter ||
+                      a.city_district || a.county || '';
+        const city  = a.city || a.town || a.village || '';
+        const pin   = a.postcode || '';
+        const road  = a.road || a.pedestrian || a.path || '';
+
+        if (area) document.getElementById('areaField').value    = area;
+        if (city) document.getElementById('cityField').value    = city;
+        if (pin)  document.getElementById('pincodeField').value = pin;
+        if (road) document.getElementById('streetField').value  = road;
+
+        st.className  = 'loc-status ok';
+        st.textContent = '✅ Location auto-filled — please review and complete the form.';
+      } catch (err) {
+        st.className  = 'loc-status err';
+        st.textContent = '❌ Could not fetch address. Fill in manually.';
+      }
+      btn.disabled = false;
+    },
+    function(err) {
+      const msgs = {
+        1: '❌ Permission denied — please allow location access.',
+        2: '❌ Location unavailable. Fill in manually.',
+        3: '❌ Request timed out. Fill in manually.'
+      };
+      st.className  = 'loc-status err';
+      st.textContent = msgs[err.code] || '❌ Could not get location.';
+      btn.disabled = false;
+    },
+    { timeout: 12000, maximumAge: 60000 }
+  );
+}
+
+
+/* ─── Account type toggle ─────────────────── */
+function toggleVehicle() {
+  const role = document.getElementById('roleSelect').value;
+  document.getElementById('vehicleGroup').style.display =
+    role === 'DELIVERY_PARTNER' ? 'block' : 'none';
+  document.getElementById('restaurantGroup').style.display =
+    role === 'RESTAURANT_OWNER' ? 'block' : 'none';
+}
+
+/* ═══════════════════════════════════════════════
+   FORM SUBMIT
+═══════════════════════════════════════════════ */
+document.getElementById('registerForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+
+  // 1. Validate password rules
+  if (!Object.values(rules).every(Boolean)) {
+    popupOpen = true;
+    document.getElementById('infoPopup').classList.add('open');
+    checkPw();
+    document.getElementById('pwField').scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
+
+  // 2. Validate match
+  if (document.getElementById('pwField').value !==
+      document.getElementById('confirmField').value) {
+    document.getElementById('confirmHint').style.color = '#c62828';
+    document.getElementById('confirmHint').textContent = '✗ Passwords do not match';
+    document.getElementById('confirmField').focus();
+    return;
+  }
+
+  // 3. Assemble full address for the 'address' param Spring Boot expects
+  const parts = [
+    document.getElementById('floorField').value.trim(),
+    document.getElementById('buildingField').value.trim(),
+    document.getElementById('streetField').value.trim(),
+    document.getElementById('areaField').value.trim(),
+    document.getElementById('cityField').value.trim() +
+      (document.getElementById('pincodeField').value.trim()
+        ? ' – ' + document.getElementById('pincodeField').value.trim() : ''),
+  ].filter(Boolean);
+
+  const lm = document.getElementById('landmarkField').value.trim();
+  if (lm) parts.push('Near ' + lm);
+
+  document.getElementById('addressHidden').value = parts.join(', ');
+
+  // 4. Submit the form
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('submitBtn').textContent = 'Creating account…';
+  this.submit();
+});
+</script>
+</body>
+</html>

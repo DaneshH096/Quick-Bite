@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Orders – Restaurant Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <link rel="stylesheet" href="/css/admin.css"/>
+  <style>
+    .step-btn { padding:6px 12px; border-radius:8px; font-size:.8rem; font-weight:700;
+      border:none; cursor:pointer; transition:.15s; }
+    .step-confirm  { background:#e3f2fd; color:#0d47a1; }
+    .step-confirm:hover  { background:#0d47a1; color:#fff; }
+    .step-preparing{ background:#f3e5f5; color:#6a1b9a; }
+    .step-preparing:hover{ background:#6a1b9a; color:#fff; }
+    .step-prepared { background:#fce4ec; color:#ad1457; }
+    .step-prepared:hover { background:#ad1457; color:#fff; }
+    .step-assign   { background:#e8f5e9; color:#2e7d32; }
+    .step-assign:hover   { background:#2e7d32; color:#fff; }
+  </style>
+</head>
+<body class="admin-body">
+
+<nav class="admin-nav">
+  <a class="nav-brand" href="/restaurant-portal">Quick<span>Bite</span> Owner</a>
+  <div class="nav-links">
+    <a href="/restaurant-portal">Dashboard</a>
+    <a href="/restaurant-portal/orders" class="active">Orders</a>
+    <a href="/restaurant-portal/menu">Menu</a>
+    <a href="/restaurant-portal/profile">Profile</a>
+    <form method="post" action="/logout" style="display:inline">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" th:if="${_csrf}"/>
+      <button type="submit" class="btn-logout">Sign Out</button>
+    </form>
+  </div>
+</nav>
+
+<main class="admin-main">
+  <h1 class="admin-title">Orders – <span th:text="${restaurant.name}"></span></h1>
+
+  <div class="admin-card">
+    <div class="table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr><th>#</th><th>Customer</th><th>Items</th><th>Amount</th><th>Status</th><th>Delivery Partner</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr th:each="o : ${orders}" th:id="'row-' + ${o.id}">
+            <td th:text="'#' + ${o.id}"></td>
+            <td><strong th:text="${o.user.name}"></strong><br/><small th:text="${o.user.phone}"></small></td>
+            <td><span th:each="oi,iter : ${o.orderItems}">
+                  <span th:text="${oi.menuItem.name + ' ×' + oi.quantity}"></span><span th:if="${!iter.last}">, </span>
+                </span></td>
+            <td>₹<span th:text="${o.totalAmount}"></span></td>
+            <td th:id="'status-' + ${o.id}">
+              <span class="status-badge" th:classappend="${#strings.toLowerCase(o.status.name())}" th:text="${o.status}"></span>
+            </td>
+            <td th:id="'partner-' + ${o.id}">
+              <span th:if="${o.deliveryPartnerId != null}" style="color:#2e7d32;font-size:.82rem;font-weight:600;">🛵 Assigned</span>
+              <span th:unless="${o.deliveryPartnerId != null}" style="color:#ccc;font-size:.82rem;">Unassigned</span>
+            </td>
+            <td th:id="'action-' + ${o.id}">
+              <button th:if="${o.status.name() == 'PENDING'}" class="step-btn step-confirm"
+                      th:data-id="${o.id}" onclick="doStep(this, 'confirm', 'CONFIRMED')">✅ Confirm</button>
+              <button th:if="${o.status.name() == 'CONFIRMED'}" class="step-btn step-preparing"
+                      th:data-id="${o.id}" onclick="doStep(this, 'preparing', 'PREPARING')">👨‍🍳 Start Preparing</button>
+              <button th:if="${o.status.name() == 'PREPARING'}" class="step-btn step-prepared"
+                      th:data-id="${o.id}" onclick="doStep(this, 'prepared', 'PREPARED')">🍽 Mark Prepared</button>
+              <button th:if="${o.status.name() == 'PREPARED' and o.deliveryPartnerId == null}" class="step-btn step-assign"
+                      th:data-id="${o.id}" onclick="doStep(this, 'auto-assign', null)">⚡ Auto-Assign Partner</button>
+              <span th:if="${o.status.name() == 'PREPARED' and o.deliveryPartnerId != null}"
+                    style="color:#aaa;font-size:.8rem;">Awaiting pickup…</span>
+              <span th:if="${#sets.contains({'PICKED_UP','OUT_FOR_DELIVERY','DELIVERED','CANCELLED'}, o.status.name())}"
+                    style="color:#aaa;font-size:.8rem;">—</span>
+            </td>
+          </tr>
+          <tr th:if="${#lists.isEmpty(orders)}">
+            <td colspan="7" style="text-align:center;color:#aaa;padding:32px;">No orders yet</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+async function doStep(btn, endpoint, nextLabel) {
+  const orderId = btn.dataset.id;
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/restaurant-portal/orders/' + orderId + '/' + endpoint, { method: 'POST' });
+    const data = await resp.json();
+    if (data.success) {
+      window.location.reload();
+    } else {
+      alert('Failed: ' + (data.message || 'unknown error'));
+      btn.disabled = false;
+    }
+  } catch (e) {
+    alert('Network error — try again');
+    btn.disabled = false;
+  }
+}
+
+// Poll so newly placed customer orders show up without a manual refresh
+setInterval(() => { window.location.reload(); }, 20000);
+</script>
+
+</body>
+</html>

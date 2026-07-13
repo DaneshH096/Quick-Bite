@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Checkout – QuickBite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    #location-map { width:100%; height:200px; border-radius:12px; margin-top:10px; display:none; }
+    .location-row {
+      display:flex; align-items:center; gap:10px;
+      padding:10px 12px; background:#f9f9fb; border-radius:10px;
+      margin-bottom:12px; font-size:.85rem;
+    }
+    .location-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .location-dot.on  { background:#4caf50; box-shadow:0 0 0 3px rgba(76,175,80,.2); }
+    .location-dot.off { background:#ccc; }
+    .loc-capture-btn {
+      padding:6px 14px; background:#1565c0; color:#fff;
+      border:none; border-radius:8px; font-family:'DM Sans',sans-serif;
+      font-weight:700; font-size:.82rem; cursor:pointer;
+      transition:.15s; margin-left:auto;
+    }
+    .loc-capture-btn:hover { background:#0d47a1; }
+    .loc-capture-btn.captured { background:#4caf50; cursor:default; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-inner">
+    <a class="nav-brand" href="/home">Quick<span>Bite</span> 🍔</a>
+    <div class="nav-links">
+      <a href="/home">Restaurants</a>
+      <a href="/orders">My Orders</a>
+      <form method="post" action="/logout" style="display:inline">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" th:if="${_csrf}"/>
+        <button type="submit" class="btn-logout">Sign Out</button>
+      </form>
+    </div>
+  </div>
+</nav>
+
+<main class="container" style="padding:48px 20px;max-width:900px;">
+  <h1 style="font-family:'Syne',sans-serif;font-size:2rem;margin-bottom:6px;">Checkout</h1>
+  <p style="color:#888;margin-bottom:32px;">Review your order and confirm delivery details</p>
+
+  <div class="checkout-layout">
+
+    <!-- Left: Delivery details -->
+    <div class="checkout-form-card">
+      <h3>📍 Delivery Details</h3>
+
+      <!-- GPS Location Capture -->
+      <div class="location-row">
+        <div class="location-dot off" id="gpsDot"></div>
+        <span id="gpsText" style="color:#888;">Pin your exact location for faster delivery</span>
+        <button class="loc-capture-btn" id="gpsCaptureBtn" onclick="captureLocation()">
+          📡 Pin Location
+        </button>
+      </div>
+      <div id="location-map"></div>
+
+      <div class="form-group" style="margin-top:12px;">
+        <label>Delivery Address</label>
+        <textarea id="deliveryAddress" rows="3"
+                  placeholder="Enter your full delivery address"
+                  th:text="${user.address}"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Special Instructions</label>
+        <textarea id="specialInstructions" rows="2"
+                  placeholder="Any special requests? (optional)"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Payment Method</label>
+        <div class="payment-options">
+          <label class="pay-opt">
+            <input type="radio" name="paymentMethod" value="CASH" checked/>
+            <span>💵 Cash on Delivery</span>
+          </label>
+          <label class="pay-opt">
+            <input type="radio" name="paymentMethod" value="ONLINE"/>
+            <span>💳 Online Payment</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Order summary -->
+    <div class="checkout-summary-card">
+      <h3>🧾 Order Summary</h3>
+      <div id="summary-items">
+        <p style="color:#aaa;">Loading cart…</p>
+      </div>
+      <hr style="border:none;border-top:2px dashed #eee;margin:16px 0;"/>
+      <div class="summary-total-row">
+        <span>Subtotal</span><span id="summary-total">₹0</span>
+      </div>
+      <div class="summary-total-row">
+        <span>Delivery fee</span><span style="color:#4caf50;">FREE</span>
+      </div>
+      <div class="summary-total-row grand-total">
+        <span>Total</span><strong id="summary-grand-total">₹0</strong>
+      </div>
+      <button id="place-order-btn" onclick="placeOrder()" class="btn-place-order">
+        🚀 Place Order
+      </button>
+      <p id="order-msg" style="margin-top:10px;text-align:center;font-weight:600;font-size:.9rem;"></p>
+    </div>
+  </div>
+</main>
+
+<!-- Success modal -->
+<div id="success-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div style="font-size:3rem;">🎉</div>
+    <h2>Order Placed!</h2>
+    <p>Your order has been received. A delivery partner will be assigned shortly.</p>
+    <p id="modal-order-id" style="color:#e53935;font-weight:700;font-size:1.1rem;margin-top:8px;"></p>
+    <p id="modal-gps-msg" style="font-size:.82rem;color:#4caf50;margin-top:4px;"></p>
+    <a href="/orders" class="btn-red" style="display:block;text-align:center;margin-top:20px;">
+      Track My Order
+    </a>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── Cart from session storage ────────────────────────────────
+const cart         = JSON.parse(sessionStorage.getItem('cart') || '{}');
+const restaurantId = sessionStorage.getItem('restaurantId');
+if (Object.keys(cart).length === 0) window.location.href = '/home';
+
+let capturedLat = null;
+let capturedLng = null;
+let locationMap = null;
+let locMarker   = null;
+
+// ── Render summary ────────────────────────────────────────────
+const items = Object.entries(cart);
+let total = 0, html = '';
+items.forEach(([id, item]) => {
+  const sub = item.price * item.qty;
+  total += sub;
+  html += `<div class="summary-row">
+    <span>${item.name} <small style="color:#aaa;">x${item.qty}</small></span>
+    <span>₹${sub.toFixed(2)}</span>
+  </div>`;
+});
+document.getElementById('summary-items').innerHTML = html;
+document.getElementById('summary-total').textContent     = '₹' + total.toFixed(2);
+document.getElementById('summary-grand-total').textContent = '₹' + total.toFixed(2);
+
+// ── Capture delivery GPS location ─────────────────────────────
+function captureLocation() {
+  const btn  = document.getElementById('gpsCaptureBtn');
+  const dot  = document.getElementById('gpsDot');
+  const text = document.getElementById('gpsText');
+  if (!navigator.geolocation) {
+    text.textContent = '❌ Geolocation not supported';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '⏳ Locating…';
+  text.textContent = 'Getting your precise location…';
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      capturedLat = pos.coords.latitude;
+      capturedLng = pos.coords.longitude;
+
+      dot.className = 'location-dot on';
+      text.innerHTML = `<span style="color:#2e7d32;font-weight:600;">📍 Location pinned</span>
+        <span style="color:#aaa;margin-left:6px;font-size:.8rem;">
+          ${capturedLat.toFixed(5)}, ${capturedLng.toFixed(5)}
+        </span>`;
+      btn.textContent = '✅ Pinned';
+      btn.className   = 'loc-capture-btn captured';
+
+      // Show mini map
+      const mapEl = document.getElementById('location-map');
+      mapEl.style.display = 'block';
+
+      if (!locationMap) {
+        locationMap = L.map('location-map', {
+          zoomControl:true, scrollWheelZoom:false
+        }).setView([capturedLat, capturedLng], 16);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(locationMap);
+      }
+
+      const icon = L.divIcon({
+        html: '<div style="width:28px;height:28px;border-radius:50%;background:#e53935;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:14px;">🏠</div>',
+        iconSize:[28,28], iconAnchor:[14,14], className:''
+      });
+      if (locMarker) locMarker.setLatLng([capturedLat, capturedLng]);
+      else locMarker = L.marker([capturedLat, capturedLng], { icon }).addTo(locationMap);
+      locationMap.setView([capturedLat, capturedLng], 16);
+
+      // Reverse geocode to auto-fill address if empty
+      const addrField = document.getElementById('deliveryAddress');
+      if (!addrField.value.trim()) {
+        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${capturedLat}&lon=${capturedLng}&format=json`)
+          .then(r => r.json())
+          .then(d => {
+            if (d.display_name) addrField.value = d.display_name;
+          }).catch(() => {});
+      }
+    },
+    err => {
+      const msgs = { 1:'Permission denied', 2:'Unavailable', 3:'Timed out' };
+      text.textContent = '❌ ' + (msgs[err.code] || 'Error');
+      btn.disabled = false;
+      btn.textContent = '📡 Pin Location';
+    },
+    { enableHighAccuracy:true, timeout:12000 }
+  );
+}
+
+// ── Place order ───────────────────────────────────────────────
+async function placeOrder() {
+  const address = document.getElementById('deliveryAddress').value.trim();
+  if (!address) { alert('Please enter a delivery address.'); return; }
+
+  const paymentMethod     = document.querySelector('input[name="paymentMethod"]:checked').value;
+  const specialInstructions = document.getElementById('specialInstructions').value;
+
+  const cartItems = {};
+  Object.entries(cart).forEach(([id, item]) => { cartItems[id] = item.qty; });
+
+  const btn = document.getElementById('place-order-btn');
+  btn.disabled = true; btn.textContent = 'Placing order…';
+
+  try {
+    const resp = await fetch('/api/orders', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        restaurantId:       parseInt(restaurantId),
+        deliveryAddress:    address,
+        paymentMethod,
+        specialInstructions,
+        cartItems,
+        deliveryLat: capturedLat,   // ← GPS sent to backend
+        deliveryLng: capturedLng
+      })
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+      sessionStorage.removeItem('cart');
+      sessionStorage.removeItem('restaurantId');
+      document.getElementById('modal-order-id').textContent = 'Order #' + data.orderId;
+      document.getElementById('modal-gps-msg').textContent  =
+        data.hasGps ? '📍 Your location has been shared with the delivery partner.' : '';
+      document.getElementById('success-modal').style.display = 'flex';
+    } else {
+      document.getElementById('order-msg').textContent = '❌ ' + data.message;
+      btn.disabled = false; btn.textContent = '🚀 Place Order';
+    }
+  } catch (e) {
+    document.getElementById('order-msg').textContent = '❌ Something went wrong. Try again.';
+    btn.disabled = false; btn.textContent = '🚀 Place Order';
+  }
+}
+
+// Auto-attempt location capture on page load (silent)
+window.addEventListener('load', () => {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        capturedLat = pos.coords.latitude;
+        capturedLng = pos.coords.longitude;
+        // Silent capture — just store coords without showing the map
+        document.getElementById('gpsDot').className = 'location-dot on';
+        document.getElementById('gpsText').innerHTML =
+          '<span style="color:#2e7d32;font-weight:600;">📍 Location auto-detected</span> ' +
+          '<span style="color:#aaa;font-size:.8rem;">(tap Pin to confirm)</span>';
+      },
+      () => {}, // silent fail
+      { timeout:5000, maximumAge:60000 }
+    );
+  }
+});
+</script>
+</body>
+</html>

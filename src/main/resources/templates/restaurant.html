@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title th:text="${restaurant.name} + ' – QuickBite'">Menu – QuickBite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="nav-inner">
+    <a class="nav-brand" href="/home">Quick<span>Bite</span> 🍔</a>
+    <div class="nav-links">
+      <a href="/home">Restaurants</a>
+      <a href="/orders">My Orders</a>
+      <a href="/profile">Profile</a>
+      <form method="post" action="/logout" style="display:inline">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" th:if="${_csrf}"/>
+        <button type="submit" class="btn-logout">Sign Out</button>
+      </form>
+    </div>
+  </div>
+</nav>
+
+<!-- Restaurant Hero -->
+<section class="rest-hero">
+  <div class="rest-hero-img" th:style="'background-image:url(' + ${restaurant.imageUrl} + ')'"></div>
+  <div class="rest-hero-overlay">
+    <div class="container">
+      <a href="/home" class="back-link">← Back</a>
+      <h1 th:text="${restaurant.name}"></h1>
+      <p th:text="${restaurant.description}"></p>
+      <div class="rest-meta">
+        <span>⭐ <span th:text="${restaurant.rating}"></span></span>
+        <span>⏱ <span th:text="${restaurant.deliveryTimeMinutes}"></span> min</span>
+        <span>🍽 <span th:text="${restaurant.cuisineType}"></span></span>
+        <span>💳 Min ₹<span th:text="${restaurant.minOrderAmount}"></span></span>
+        <span th:if="${restaurant.isOpen}" style="color:#4caf50;font-weight:700;">🟢 Open now</span>
+        <span th:unless="${restaurant.isOpen}" style="color:#e53935;font-weight:700;">🔴 Closed right now</span>
+      </div>
+      <div th:unless="${restaurant.isOpen}"
+           style="margin-top:10px;background:#ffebee;color:#c62828;border-radius:10px;
+                  padding:10px 16px;font-size:.9rem;font-weight:600;display:inline-block;">
+        This restaurant isn't accepting orders right now. Please check back later.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Menu + Cart Layout -->
+<div class="menu-layout container">
+
+  <!-- Menu Items -->
+  <section class="menu-section">
+    <h2>📋 Menu</h2>
+    <div class="menu-grid">
+
+      <!--
+        FIX: Remove all th:onclick with escaped quotes (causes Eclipse "',' expected" error).
+        Instead use data-* attributes on the button and read them in plain JS via dataset.
+        This is cleaner, avoids all Thymeleaf/JS escaping conflicts, and is Eclipse-safe.
+      -->
+      <div th:each="item : ${menuItems}" class="menu-card">
+        <div class="menu-img-wrap">
+          <img th:src="${item.imageUrl}" th:alt="${item.name}"
+               onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300'"
+               style="width:100%;height:100%;object-fit:cover;border-radius:12px;"/>
+        </div>
+        <div class="menu-info">
+          <div class="menu-name-row">
+            <h4 th:text="${item.name}"></h4>
+            <span class="veg-badge" th:if="${item.isVegetarian}">🟢</span>
+            <span class="veg-badge" th:unless="${item.isVegetarian}">🔴</span>
+          </div>
+          <p class="menu-desc" th:text="${item.description}"></p>
+          <div class="menu-footer">
+            <span class="menu-price">₹<span th:text="${item.price}"></span></span>
+
+            <!-- Qty controls: hidden until item is added -->
+            <div class="qty-controls"
+                 th:id="'qty-ctrl-' + ${item.id}"
+                 style="display:none">
+              <!--
+                FIX: Use data-id attribute + onclick="changeQty(this)" instead of
+                th:onclick with string concatenation — no escaping issues.
+              -->
+              <button class="qty-btn"
+                      th:data-id="${item.id}"
+                      onclick="changeQty(this.dataset.id, -1)">−</button>
+              <span class="qty-val" th:id="'qty-' + ${item.id}">0</span>
+              <button class="qty-btn"
+                      th:data-id="${item.id}"
+                      onclick="changeQty(this.dataset.id, 1)">+</button>
+            </div>
+
+            <!--
+              FIX: Store id/name/price as data-* attributes.
+              onclick reads them via this.dataset — zero Thymeleaf/JS escaping needed.
+            -->
+            <button class="add-btn"
+                    th:id="'add-' + ${item.id}"
+                    th:data-id="${item.id}"
+                    th:data-name="${item.name}"
+                    th:data-price="${item.price}"
+                    th:disabled="${!restaurant.isOpen}"
+                    onclick="addToCart(this.dataset.id, this.dataset.name, this.dataset.price)">
+              <span th:text="${restaurant.isOpen} ? '+ Add' : 'Closed'"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Cart Sidebar -->
+  <aside class="cart-sidebar" id="cart">
+    <h2>🛒 Your Cart</h2>
+    <div id="cart-items">
+      <div class="cart-empty" id="cart-empty">Your cart is empty</div>
+    </div>
+    <div class="cart-total-row" id="cart-total-row" style="display:none">
+      <span>Total</span>
+      <strong id="cart-total">₹0</strong>
+    </div>
+    <button class="btn-checkout" id="checkout-btn" onclick="goCheckout()" style="display:none">
+      Proceed to Checkout →
+    </button>
+  </aside>
+</div>
+
+
+<script th:inline="javascript">
+  /*<![CDATA[*/
+
+  /* Thymeleaf replaces this at render time with the real numeric restaurant ID */
+  const RESTAURANT_ID = /*[[${restaurant.id}]]*/ 0;
+
+  let cart = {};   // { "itemId": { name, price, qty } }
+
+  function addToCart(id, name, price) {
+    /*
+      FIX 3: price arrives as a STRING from data-price attribute.
+      Multiply operations on strings produce NaN.
+      Always parse to float before storing.
+    */
+    const numPrice = parseFloat(price);
+    if (!cart[id]) {
+      cart[id] = { name: name, price: numPrice, qty: 1 };
+    } else {
+      cart[id].qty++;
+    }
+    document.getElementById('add-' + id).style.display      = 'none';
+    document.getElementById('qty-ctrl-' + id).style.display = 'flex';
+    document.getElementById('qty-' + id).textContent        = cart[id].qty;
+    renderCart();
+  }
+
+  function changeQty(id, delta) {
+    if (!cart[id]) return;
+    cart[id].qty += delta;
+    if (cart[id].qty <= 0) {
+      delete cart[id];
+      document.getElementById('add-' + id).style.display      = 'inline-flex';
+      document.getElementById('qty-ctrl-' + id).style.display = 'none';
+      document.getElementById('qty-' + id).textContent        = '0';
+    } else {
+      document.getElementById('qty-' + id).textContent = cart[id].qty;
+    }
+    renderCart();
+  }
+
+  function renderCart() {
+    const items      = Object.entries(cart);
+    const container  = document.getElementById('cart-items');
+    const totalRow   = document.getElementById('cart-total-row');
+    const checkoutBtn= document.getElementById('checkout-btn');
+
+    if (items.length === 0) {
+      container.innerHTML = '<div class="cart-empty">Your cart is empty</div>';
+      totalRow.style.display   = 'none';
+      checkoutBtn.style.display= 'none';
+      return;
+    }
+
+    let total = 0;
+    let html  = '';
+    items.forEach(function(entry) {
+      const id   = entry[0];
+      const item = entry[1];
+      const subtotal = item.price * item.qty;
+      total += subtotal;
+      html += '<div class="cart-row">'
+            +   '<div class="cart-row-info">'
+            +     '<span class="cart-item-name">' + item.name + '</span>'
+            +     '<span class="cart-item-qty">x' + item.qty + '</span>'
+            +   '</div>'
+            +   '<span class="cart-item-price">₹' + subtotal.toFixed(2) + '</span>'
+            + '</div>';
+    });
+
+    container.innerHTML = html;
+    document.getElementById('cart-total').textContent = '₹' + total.toFixed(2);
+    totalRow.style.display    = 'flex';
+    checkoutBtn.style.display = 'block';
+  }
+
+  function goCheckout() {
+    if (Object.keys(cart).length === 0) {
+      alert('Your cart is empty!');
+      return;
+    }
+    sessionStorage.setItem('cart',         JSON.stringify(cart));
+    sessionStorage.setItem('restaurantId', RESTAURANT_ID);
+    window.location.href = '/checkout';
+  }
+
+  /*]]>*/
+</script>
+
+</body>
+</html>

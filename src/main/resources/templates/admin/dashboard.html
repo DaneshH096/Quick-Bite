@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin Dashboard – QuickBite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link
+	href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap"
+	rel="stylesheet" />
+<link rel="stylesheet" href="/css/style.css" />
+<link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body class="admin-body">
+
+	<nav class="admin-nav">
+		<a class="nav-brand" href="/admin">Quick<span>Bite</span> Admin
+		</a>
+		<div class="nav-links">
+			<a href="/admin" class="active">Dashboard</a> <a
+				href="/admin/restaurants">Restaurants</a> <a href="/admin/orders">Orders</a>
+			<a href="/admin/delivery-partners">Partners</a> <a href="/admin/map">🗺
+				Live Map</a> <a href="/home">← Customer View</a>
+			<form method="post" action="/logout" style="display: inline">
+				<input type="hidden" th:name="${_csrf.parameterName}"
+					th:value="${_csrf.token}" th:if="${_csrf}" />
+				<button type="submit" class="btn-logout">Sign Out</button>
+			</form>
+		</div>
+	</nav>
+
+	<main class="admin-main">
+		<h1 class="admin-title">Dashboard</h1>
+
+		<!-- Stats cards -->
+		<div class="stats-grid" style="grid-template-columns: repeat(6, 1fr);">
+			<div class="stat-card orange">
+				<div class="stat-icon">🏪</div>
+				<div class="stat-val" th:text="${totalRestaurants}">0</div>
+				<div class="stat-label">Restaurants</div>
+			</div>
+			<div class="stat-card blue">
+				<div class="stat-icon">📦</div>
+				<div class="stat-val" th:text="${totalOrders}">0</div>
+				<div class="stat-label">Total Orders</div>
+			</div>
+			<div class="stat-card green">
+				<div class="stat-icon">✅</div>
+				<div class="stat-val"
+					th:text="${#lists.size(orders.?[status.name() == 'DELIVERED'])}">0</div>
+				<div class="stat-label">Delivered</div>
+			</div>
+			<div class="stat-card red">
+				<div class="stat-icon">⏳</div>
+				<div class="stat-val"
+					th:text="${#lists.size(orders.?[status.name() == 'PENDING'])}">0</div>
+				<div class="stat-label">Pending</div>
+			</div>
+			<div class="stat-card" style="background: #e8eaf6;">
+				<div class="stat-icon">🛵</div>
+				<div class="stat-val" th:text="${totalPartners}">0</div>
+				<div class="stat-label">Partners</div>
+			</div>
+			<div class="stat-card" style="background: #e0f2f1;">
+				<div class="stat-icon">🟢</div>
+				<div class="stat-val" th:text="${availablePartners}">0</div>
+				<div class="stat-label">Available Now</div>
+			</div>
+		</div>
+
+		<!-- Quick actions -->
+		<div
+			style="display: flex; gap: 12px; margin-bottom: 28px; flex-wrap: wrap;">
+			<a href="/admin/map"
+				style="display: flex; align-items: center; gap: 8px; padding: 10px 18px; background: #1a1a2e; color: #fff; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: .88rem; transition: .15s;">
+				🗺 Open Live Map </a> <a href="/admin/delivery-partners"
+				style="display: flex; align-items: center; gap: 8px; padding: 10px 18px; background: #e3f2fd; color: #1565c0; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: .88rem;">
+				🛵 Manage Partners </a> <a href="/admin/orders"
+				style="display: flex; align-items: center; gap: 8px; padding: 10px 18px; background: #fff3e0; color: #e65100; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: .88rem;">
+				📦 Assign Orders </a>
+		</div>
+
+		<!-- Recent orders table -->
+		<div class="admin-card">
+			<div class="admin-card-header">
+				<h2>Recent Orders</h2>
+				<a href="/admin/orders" class="btn-sm">View All →</a>
+			</div>
+			<div class="table-wrap">
+				<table class="admin-table">
+					<thead>
+						<tr>
+							<th>#ID</th>
+							<th>Customer</th>
+							<th>Restaurant</th>
+							<th>Amount</th>
+							<th>GPS</th>
+							<th>Status</th>
+							<th>Delivery Partner</th>
+							<th>Date</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr th:each="o,iterStat : ${orders}" th:if="${iterStat.index < 10}">							<td th:text="'#' + ${o.id}"></td>
+							<td th:text="${o.user.name}"></td>
+							<td th:text="${o.restaurant.name}"></td>
+							<td th:text="'₹' + ${o.totalAmount}"></td>
+							<td><span th:if="${o.deliveryLat != null}"
+								style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 20px; font-size: .75rem; font-weight: 700;">📍
+									GPS</span> <span th:unless="${o.deliveryLat != null}"
+								style="color: #ccc; font-size: .78rem;">—</span></td>
+							<td><span class="status-badge" th:text="${o.status}"
+								th:classappend="${o.status.name().toLowerCase()}"></span></td>
+							<td><span th:if="${o.deliveryPartnerId != null}"
+								style="font-size: .82rem; font-weight: 700; color: #1565c0;">
+									🛵 Assigned </span> <span th:unless="${o.deliveryPartnerId != null}"
+								style="font-size: .78rem; color: #ccc;">Unassigned</span></td>
+							<td th:text="${#temporals.format(o.createdAt,'dd MMM, HH:mm')}"></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</main>
+</body>
+</html>
