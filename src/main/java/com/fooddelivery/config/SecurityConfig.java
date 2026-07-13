@@ -43,6 +43,7 @@ public class SecurityConfig {
                     "/forgot-password", "/reset-password"
                 ).permitAll()
                 .requestMatchers("/api/restaurants/**").permitAll()
+                .requestMatchers("/api/health").permitAll()
                 // Admin only
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 // Delivery partner portal
