@@ -3,55 +3,82 @@ package com.fooddelivery.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.MailException;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
 
-import jakarta.mail.internet.MimeMessage;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Sends transactional emails (currently just the password-reset link) via
- * SMTP, configured through spring.mail.* properties in application.properties.
+ * Resend's HTTPS API (https://resend.com/docs/api-reference/emails/send-email).
  *
- * Kept deliberately simple — one method, one email — but structured so more
- * email types (order confirmations, etc.) can be added the same way later.
+ * Deliberately NOT using SMTP: most cloud hosts (Railway included, on its
+ * Free/Trial/Hobby plans) block outbound SMTP entirely to fight spam abuse —
+ * see https://docs.railway.com/networking/outbound-networking. A plain HTTPS
+ * POST on port 443 sidesteps that completely, since it's indistinguishable
+ * from any other API call the app makes.
  */
 @Service
 public class EmailService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
+    private static final String RESEND_API_URL = "https://api.resend.com/emails";
 
-    private final JavaMailSender mailSender;
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    @Value("${resend.api-key}")
+    private String apiKey;
 
     @Value("${app.mail.from}")
     private String fromAddress;
 
-    public EmailService(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
-
     /**
-     * @return true if the email was handed off to the SMTP server successfully,
-     *         false if sending failed (caller decides how to degrade gracefully —
-     *         e.g. showing the link on-screen instead, which is invaluable
-     *         during local development before real SMTP creds are set up).
+     * @return true if Resend accepted the email for delivery, false if sending
+     *         failed (caller decides how to degrade gracefully — e.g. showing
+     *         the link on-screen instead, which matters a lot before the API
+     *         key is configured or before a sending domain is verified).
      */
     public boolean sendPasswordResetEmail(String toEmail, String userName, String resetLink) {
+        if (apiKey == null || apiKey.isBlank()) {
+            log.error("Cannot send password reset email — RESEND_API_KEY is not set. " +
+                "Get a free key at https://resend.com/api-keys and set it as an env var.");
+            return false;
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+
+        Map<String, Object> body = Map.of(
+            "from",    "QuickBite <" + fromAddress + ">",
+            "to",      List.of(toEmail),
+            "subject", "Reset your QuickBite password",
+            "html",    buildHtmlBody(userName, resetLink)
+        );
+
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
-            helper.setFrom(fromAddress, "QuickBite");
-            helper.setTo(toEmail);
-            helper.setSubject("Reset your QuickBite password");
-            helper.setText(buildHtmlBody(userName, resetLink), true);
-            mailSender.send(message);
-            log.info("Password reset email sent to {}", toEmail);
-            return true;
-        } catch (MailException | java.io.UnsupportedEncodingException | jakarta.mail.MessagingException e) {
-            // Don't let a broken SMTP config break the forgot-password flow —
-            // log it clearly so it's easy to diagnose, and let the caller fall back.
-            log.error("Failed to send password reset email to {}: {}", toEmail, e.getMessage());
+            ResponseEntity<String> response = restTemplate.postForEntity(
+                RESEND_API_URL, new HttpEntity<>(body, headers), String.class);
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                log.info("Password reset email sent to {} via Resend", toEmail);
+                return true;
+            }
+            log.error("Resend returned {} sending to {}: {}",
+                response.getStatusCode(), toEmail, response.getBody());
+            return false;
+        } catch (RestClientException e) {
+            // Covers 4xx/5xx from Resend (e.g. "you can only send to your own
+            // address until you verify a domain") as well as network failures.
+            // Don't let a bad response break the forgot-password flow — log it
+            // clearly so it's easy to diagnose, and let the caller fall back.
+            log.error("Failed to send password reset email to {} via Resend: {}", toEmail, e.getMessage());
             return false;
         }
     }
