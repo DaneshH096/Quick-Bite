@@ -126,6 +126,7 @@ public class RestaurantController {
         Restaurant restaurant = myRestaurant(auth);
 
         MenuItem item;
+        boolean isNew = (id == null);
         if (id != null) {
             item = restaurantService.getMenuItemById(id).orElse(new MenuItem());
             // Ownership check — never let one owner edit another restaurant's dish
@@ -142,7 +143,12 @@ public class RestaurantController {
         item.setCategory(category);
         if (imageUrl != null && !imageUrl.isBlank()) item.setImageUrl(imageUrl);
         item.setIsVegetarian(isVegetarian);
-        item.setIsAvailable(true);
+        // Only force "available" on brand-new dishes. Editing an existing dish must
+        // NOT silently flip it back to available if the owner had 86'd it earlier —
+        // and defend against a stray null ever being treated as unavailable.
+        if (isNew || item.getIsAvailable() == null) {
+            item.setIsAvailable(true);
+        }
         restaurantService.saveMenuItemWithPhoto(item, photo);
         return "redirect:/restaurant-portal/menu";
     }
@@ -233,18 +239,11 @@ public class RestaurantController {
         }
     }
 
-    // Restaurant can also trigger auto-assign of the nearest delivery partner
-    // once food is ready, instead of waiting for admin/partner to pick it up.
-    @PostMapping("/orders/{id}/auto-assign")
-    @ResponseBody
-    public ResponseEntity<?> autoAssign(@PathVariable Long id, Authentication auth) {
-        try {
-            Restaurant restaurant = myRestaurant(auth);
-            assertOwnsOrder(restaurant, orderService.getOrderById(id).orElseThrow());
-            Order updated = orderService.autoAssignNearestPartner(id);
-            return ResponseEntity.ok(Map.of("success", true, "status", updated.getStatus()));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
-        }
-    }
+    // NOTE: There used to be an "auto-assign nearest partner" action here that
+    // force-picked whichever delivery partner happened to be online — which
+    // meant a single online partner got every order with no say in it. That's
+    // been removed. Once an order is marked PREPARED, it automatically shows
+    // up in every online delivery partner's "Ready for Pickup" queue
+    // (see DeliveryController#readyOrders), and assignment only happens when
+    // a partner explicitly taps Accept (DeliveryController#acceptOrder).
 }

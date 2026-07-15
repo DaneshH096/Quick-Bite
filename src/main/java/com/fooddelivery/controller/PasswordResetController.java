@@ -1,9 +1,13 @@
 package com.fooddelivery.controller;
 
 import com.fooddelivery.model.PasswordResetToken;
+import com.fooddelivery.model.User;
+import com.fooddelivery.service.EmailService;
 import com.fooddelivery.service.PasswordResetService;
+import com.fooddelivery.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -15,7 +19,7 @@ import java.util.Optional;
  *
  * URLs (all public — no login required):
  *   GET  /forgot-password            → show "enter your email" form
- *   POST /forgot-password            → create token, show the reset link
+ *   POST /forgot-password            → create token, EMAIL the reset link
  *   GET  /reset-password?token=UUID  → show "enter new password" form
  *   POST /reset-password             → apply the new password
  */
@@ -23,6 +27,13 @@ import java.util.Optional;
 public class PasswordResetController {
 
     @Autowired private PasswordResetService passwordResetService;
+    @Autowired private EmailService         emailService;
+    @Autowired private UserService          userService;
+
+    // Falls back to this if the request's own host/port can't be trusted
+    // (e.g. behind a reverse proxy) — set APP_BASE_URL in application.properties.
+    @Value("${app.base-url}")
+    private String configuredBaseUrl;
 
     // ── Step 1: Show forgot-password form ─────────────────────────
     @GetMapping("/forgot-password")
@@ -30,30 +41,34 @@ public class PasswordResetController {
         return "auth/forgot-password";
     }
 
-    // ── Step 2: Process email, generate token, show reset link ────
+    // ── Step 2: Process email, generate token, EMAIL the reset link ───
     @PostMapping("/forgot-password")
     public String processForgotPassword(@RequestParam String email,
                                          HttpServletRequest request,
                                          Model model) {
-        // Always show "sent" message even if email not found (prevents enumeration)
+        // Always show the same "sent" message even if the email isn't found
+        // (prevents attackers from using this form to enumerate real accounts)
         model.addAttribute("email", email);
 
         Optional<String> tokenOpt = passwordResetService.createResetToken(email);
 
         if (tokenOpt.isPresent()) {
             String token = tokenOpt.get();
+            String resetLink = configuredBaseUrl + "/reset-password?token=" + token;
 
-            // Build the full reset URL for display
-            // In production: send this via email instead
-            String baseUrl = request.getScheme() + "://" + request.getServerName()
-                + (request.getServerPort() != 80 && request.getServerPort() != 443
-                    ? ":" + request.getServerPort() : "");
-            String resetLink = baseUrl + "/reset-password?token=" + token;
+            User user = userService.findByEmail(email.trim().toLowerCase()).orElseThrow();
+            boolean emailSent = emailService.sendPasswordResetEmail(user.getEmail(), user.getName(), resetLink);
 
-            model.addAttribute("resetLink", resetLink);
             model.addAttribute("tokenFound", true);
+            model.addAttribute("emailSent", emailSent);
+            if (!emailSent) {
+                // SMTP isn't configured / failed — don't leave the person stuck.
+                // Show the link directly with a clear warning instead of
+                // silently pretending an email went out.
+                model.addAttribute("resetLink", resetLink);
+            }
         } else {
-            // Email not found — still show success-like page (no enumeration)
+            // Email not found — still show the same success-like page (no enumeration)
             model.addAttribute("tokenFound", false);
         }
 

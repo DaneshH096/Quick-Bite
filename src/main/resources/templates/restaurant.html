@@ -39,10 +39,10 @@
         <span>⏱ <span th:text="${restaurant.deliveryTimeMinutes}"></span> min</span>
         <span>🍽 <span th:text="${restaurant.cuisineType}"></span></span>
         <span>💳 Min ₹<span th:text="${restaurant.minOrderAmount}"></span></span>
-        <span th:if="${restaurant.isOpen}" style="color:#4caf50;font-weight:700;">🟢 Open now</span>
-        <span th:unless="${restaurant.isOpen}" style="color:#e53935;font-weight:700;">🔴 Closed right now</span>
+        <span th:if="${restaurant.isOpen != false}" style="color:#4caf50;font-weight:700;">🟢 Open now</span>
+        <span th:if="${restaurant.isOpen == false}" style="color:#e53935;font-weight:700;">🔴 Closed right now</span>
       </div>
-      <div th:unless="${restaurant.isOpen}"
+      <div th:if="${restaurant.isOpen == false}"
            style="margin-top:10px;background:#ffebee;color:#c62828;border-radius:10px;
                   padding:10px 16px;font-size:.9rem;font-weight:600;display:inline-block;">
         This restaurant isn't accepting orders right now. Please check back later.
@@ -106,9 +106,9 @@
                     th:data-id="${item.id}"
                     th:data-name="${item.name}"
                     th:data-price="${item.price}"
-                    th:disabled="${!restaurant.isOpen}"
+                    th:disabled="${restaurant.isOpen == false}"
                     onclick="addToCart(this.dataset.id, this.dataset.name, this.dataset.price)">
-              <span th:text="${restaurant.isOpen} ? '+ Add' : 'Closed'"></span>
+              <span th:text="${restaurant.isOpen != false} ? '+ Add' : 'Closed'"></span>
             </button>
           </div>
         </div>

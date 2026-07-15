@@ -50,10 +50,10 @@
               <td>₹<span th:text="${item.price}"></span></td>
               <td th:text="${item.isVegetarian ? '🟢' : '🔴'}"></td>
               <td>
-                <button class="btn-sm" th:classappend="${item.isAvailable ? 'blue' : 'red'}"
-                        th:text="${item.isAvailable ? 'In stock' : '86’d'}"
+                <button class="btn-sm" th:classappend="${item.isAvailable != false} ? 'blue' : 'red'"
+                        th:text="${item.isAvailable != false} ? 'In stock' : '86’d'"
                         th:data-id="${item.id}"
-                        th:data-available="${item.isAvailable}"
+                        th:data-available="${item.isAvailable != false}"
                         onclick="toggleAvailability(this)"></button>
               </td>
               <td>

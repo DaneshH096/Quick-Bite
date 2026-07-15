@@ -241,8 +241,6 @@
                                     + (${o.deliveryLat} != null ? ${o.deliveryLat} : 'null') + ','
                                     + (${o.deliveryLng} != null ? ${o.deliveryLng} : 'null') + ')'">
 										👤 Assign</button>
-									<button class="auto-btn" th:if="${o.deliveryLat != null}"
-										th:onclick="'autoAssign(' + ${o.id} + ')'">⚡ Auto</button>
 								</div>
 							</td>
 							<td th:text="${#temporals.format(o.createdAt,'dd MM, HH:mm')}"></td>
@@ -463,23 +461,6 @@ async function confirmAssign() {
     document.getElementById('assignMsg').style.color = '#c62828';
     document.getElementById('assignMsg').textContent = '❌ ' + data.message;
     btn.disabled = false; btn.textContent = 'Confirm Assignment';
-  }
-}
-
-// ── Auto-assign nearest ───────────────────────────────────────
-async function autoAssign(orderId) {
-  if (!confirm('Auto-assign nearest available partner to Order #' + orderId + '?')) return;
-
-  const resp = await fetch('/admin/orders/' + orderId + '/auto-assign', { method:'POST' });
-  const data = await resp.json();
-
-  if (data.success) {
-    const cell = document.getElementById('partner-cell-' + orderId);
-    if (cell) cell.innerHTML =
-      `<span class="partner-tag">🛵 ${data.partnerName}</span>`;
-    showToast('⚡ Auto-assigned to ' + data.partnerName);
-  } else {
-    alert('Auto-assign failed: ' + data.message);
   }
 }
 

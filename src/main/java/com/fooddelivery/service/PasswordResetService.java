@@ -28,8 +28,8 @@ public class PasswordResetService {
      * Finds the user, deletes any existing tokens for them,
      * creates a fresh UUID token with 1-hour expiry, and saves it.
      *
-     * Returns the raw token string so the controller can build the link.
-     * In production, this is where you'd call emailService.sendResetEmail().
+     * Returns the raw token string so the controller can build the link and
+     * hand it to EmailService to actually send it.
      *
      * Returns empty Optional if no user found with that email
      * (caller handles the "email not found" case transparently to avoid enumeration).

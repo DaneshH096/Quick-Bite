@@ -68,8 +68,8 @@
                       th:data-id="${o.id}" onclick="doStep(this, 'preparing', 'PREPARING')">👨‍🍳 Start Preparing</button>
               <button th:if="${o.status.name() == 'PREPARING'}" class="step-btn step-prepared"
                       th:data-id="${o.id}" onclick="doStep(this, 'prepared', 'PREPARED')">🍽 Mark Prepared</button>
-              <button th:if="${o.status.name() == 'PREPARED' and o.deliveryPartnerId == null}" class="step-btn step-assign"
-                      th:data-id="${o.id}" onclick="doStep(this, 'auto-assign', null)">⚡ Auto-Assign Partner</button>
+              <span th:if="${o.status.name() == 'PREPARED' and o.deliveryPartnerId == null}"
+                    style="color:#e65100;font-size:.8rem;font-weight:600;">🔔 Waiting for a delivery partner to accept…</span>
               <span th:if="${o.status.name() == 'PREPARED' and o.deliveryPartnerId != null}"
                     style="color:#aaa;font-size:.8rem;">Awaiting pickup…</span>
               <span th:if="${#sets.contains({'PICKED_UP','OUT_FOR_DELIVERY','DELIVERED','CANCELLED'}, o.status.name())}"

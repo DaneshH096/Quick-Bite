@@ -30,3 +30,9 @@ ALTER TABLE orders
   MODIFY COLUMN status
     ENUM('PENDING','CONFIRMED','PREPARING','PREPARED','PICKED_UP',
          'OUT_FOR_DELIVERY','DELIVERED','CANCELLED') DEFAULT 'PENDING';
+
+-- 4. Backfill: ddl-auto=update adds the new column to EXISTING rows as NULL,
+--    not TRUE, even though the column has a DEFAULT TRUE for future inserts.
+--    A null Boolean then breaks any Thymeleaf expression that negates it
+--    directly inside ${...} (e.g. ${!r.isOpen}), so backfill it explicitly.
+UPDATE restaurants SET is_open = TRUE WHERE is_open IS NULL;

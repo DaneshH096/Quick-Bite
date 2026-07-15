@@ -115,7 +115,7 @@
              data-fallback="/images/food-placeholder.jpg"
              onerror="this.src=this.getAttribute('data-fallback')"/>
         <span class="cuisine-tag" th:text="${r.cuisineType}"></span>
-        <span th:if="${!r.isOpen}"
+        <span th:if="${r.isOpen == false}"
               style="position:absolute;top:10px;left:10px;background:#e53935;color:#fff;
                      font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:20px;">
           Closed

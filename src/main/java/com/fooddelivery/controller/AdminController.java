@@ -159,23 +159,13 @@ public class AdminController {
         }
     }
 
-    // ── Auto-assign nearest partner ────────────────────────────────
-    @PostMapping("/orders/{id}/auto-assign")
-    @ResponseBody
-    public ResponseEntity<?> autoAssign(@PathVariable Long id) {
-        try {
-            Order updated = orderService.autoAssignNearestPartner(id);
-            User partner  = deliveryPartnerService.findById(updated.getDeliveryPartnerId()).orElseThrow();
-            return ResponseEntity.ok(Map.of(
-                "success",     true,
-                "partnerName", partner.getName(),
-                "partnerPhone",partner.getPhone(),
-                "status",      updated.getStatus()
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
-        }
-    }
+    // NOTE: The old "auto-assign nearest available partner" endpoint was removed.
+    // It used to force-assign an order to whichever partner happened to be
+    // online — which meant that if only one partner was online, they were
+    // assigned instantly with no say in it. Assignment now only happens when
+    // an admin explicitly picks a partner above, or when a delivery partner
+    // themselves accepts a ready order from their own dashboard
+    // (see DeliveryController#acceptOrder).
 
     // ── Delivery Partners management page ──────────────────────────
     @GetMapping("/delivery-partners")

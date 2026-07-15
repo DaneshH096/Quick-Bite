@@ -88,6 +88,13 @@ public class OrderService {
         if (partner.getRole() != User.Role.DELIVERY_PARTNER)
             throw new RuntimeException("User is not a delivery partner");
 
+        // Guard against two partners both tapping "Accept" on the same ready
+        // order at nearly the same time — first one in wins, the second gets
+        // a clear error instead of silently overwriting the first partner.
+        if (order.getDeliveryPartnerId() != null && !order.getDeliveryPartnerId().equals(partnerId)) {
+            throw new RuntimeException("This order was just accepted by another delivery partner");
+        }
+
         // Assigning a partner does NOT change the order status by itself —
         // the food may still be PREPARING. The partner physically collects it
         // and calls markPickedUp() themselves once the restaurant hands it over.
@@ -98,22 +105,16 @@ public class OrderService {
     }
 
     // ── Auto-assign nearest ────────────────────────────────────────
-    @Transactional
-    public Order autoAssignNearestPartner(Long orderId) {
-        Order order = orderRepository.findById(orderId)
-            .orElseThrow(() -> new RuntimeException("Order not found"));
-
-        if (order.getDeliveryLat() == null || order.getDeliveryLng() == null)
-            throw new RuntimeException("Order has no GPS coordinates");
-
-        List<User> nearest = userRepository
-            .findNearestAvailablePartners(order.getDeliveryLat(), order.getDeliveryLng());
-
-        if (nearest.isEmpty())
-            throw new RuntimeException("No available delivery partners nearby");
-
-        return assignDeliveryPartner(orderId, nearest.get(0).getId());
-    }
+    // NOTE: A previous version of this method ("autoAssignNearestPartner")
+    // force-assigned an order to whichever delivery partner happened to be
+    // nearest/online — with no acceptance step. That meant a single online
+    // partner got every order automatically, with zero say in it. Assignment
+    // now only ever happens two ways:
+    //   1. An admin explicitly picks a specific partner (assignDeliveryPartner
+    //      above, called from AdminController).
+    //   2. A delivery partner sees the order in their own "Ready for Pickup"
+    //      queue (getReadyForPickupOrders below) and explicitly accepts it
+    //      themselves (also routes through assignDeliveryPartner).
 
     // ── Update order status ────────────────────────────────────────
     @Transactional
